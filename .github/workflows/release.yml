@@ -1,0 +1,55 @@
+# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
+
+name: release
+
+on:
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      version:
+        # Friendly description to be shown in the UI instead of 'name'
+        description: 'Version'
+        # Default value if no value is explicitly provided
+        default: '1.0.0'
+        # Input has to be provided for the workflow to run
+        required: true
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    permissions: write-all # Required if project is private
+    
+    steps:
+
+    - uses: actions/checkout@v3
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build with Maven
+      shell: pwsh
+      run: mvn -B package --file pom.xml -DskipTests
+
+    - name: Show files.
+      run: |
+        echo Showing current directory:
+        ls
+        echo Showing ./target directory:
+        ls ./target
+      
+    - uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: ${{ github.event.inputs.version }}
+        prerelease: false
+        title: ${{ github.event.inputs.version }}
+        files: |
+          ./target/*.tar.gz
+          ./target/*.zip
+          ./target/*.jar
+          ./target/*.exe
