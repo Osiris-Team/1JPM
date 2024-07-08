@@ -38,7 +38,7 @@ class ThisProject extends JPM.Project {
 }
 
 
-// 1JPM version 1.0.0 by Osiris-Team
+// 1JPM version 1.0.1 by Osiris-Team
 public class JPM {
     public static final Plugin ROOT = new Plugin("root");
     static{
@@ -73,6 +73,7 @@ public class JPM {
             long endTime = System.currentTimeMillis();
             System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
         }
+        System.out.println("All relevant files can be found inside /build at "+thisProject.buildDir);
     }
 
     public static interface ConsumerWithException<T> extends Serializable {
