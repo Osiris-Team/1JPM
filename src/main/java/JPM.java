@@ -10,9 +10,6 @@ import java.util.stream.Stream;
 
 class ThisProject extends JPM.Project {
     static{
-        // Register third-party plugins here with:
-        // System.out.print(ThirdPartyPlugin.GET);
-
         JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
             //deployToServer(project); // If it throws an exception the whole build stops
         }));
@@ -42,26 +39,9 @@ class ThisProject extends JPM.Project {
 }
 
 
-// 1JPM version 1.0.1 by Osiris-Team
+// 1JPM version 1.0.2 by Osiris-Team
 public class JPM {
     public static final Plugin ROOT = new Plugin("root");
-
-    static{
-        // Register all internal plugins/tasks
-        System.out.print(Clean.GET);
-        System.out.print(Compile.GET);
-        System.out.print(ProcessResources.GET);
-        System.out.print(CompileTest.GET);
-        System.out.print(Test.GET);
-        System.out.print(Jar.GET);
-        System.out.print(FatJar.GET);
-        System.out.print(Dependencies.GET);
-        System.out.print(DependencyUpdate.GET);
-        System.out.print(Help.GET);
-        System.out.print(ResolveDependencies.GET);
-        System.out.print(Build.GET);
-        System.out.println();
-    }
 
     public static void main(String[] args) throws Exception {
         List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -294,13 +274,11 @@ public class JPM {
     // Internal plugins
     //
 
+    static {
+        ROOT.pluginsAfter.add(Clean.GET);
+    }
     public static class Clean extends Plugin {
         public static Clean GET = new Clean();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Clean() {
             super("clean");
             withExecute((project) -> {
@@ -313,13 +291,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Compile.GET);
+    }
     public static class Compile extends Plugin {
         public static Compile GET = new Compile();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Compile() {
             super("compile");
             withExecute((project) -> {
@@ -340,13 +316,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(ProcessResources.GET);
+    }
     public static class ProcessResources extends Plugin {
         public static ProcessResources GET = new ProcessResources();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public ProcessResources() {
             super("processResources");
             withExecute((project) -> {
@@ -373,13 +347,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(CompileTest.GET);
+    }
     public static class CompileTest extends Plugin {
         public static CompileTest GET = new CompileTest();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public CompileTest() {
             super("compileTest");
             withExecute((project) -> {
@@ -400,13 +372,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Test.GET);
+    }
     public static class Test extends Plugin {
         public static Test GET = new Test();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Test() {
             super("test");
             withExecute((project) -> {
@@ -427,13 +397,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Jar.GET);
+    }
     public static class Jar extends Plugin {
         public static Jar GET = new Jar();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Jar() {
             super("jar");
             withExecute((project) -> {
@@ -462,13 +430,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(FatJar.GET);
+    }
     public static class FatJar extends Plugin {
         public static FatJar GET = new FatJar();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public FatJar() {
             super("fatJar");
             withExecute((project) -> {
@@ -494,13 +460,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Dependencies.GET);
+    }
     public static class Dependencies extends Plugin {
         public static Dependencies GET = new Dependencies();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Dependencies() {
             super("dependencies");
             withExecute((project) -> {
@@ -512,13 +476,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(DependencyUpdate.GET);
+    }
     public static class DependencyUpdate extends Plugin {
         public static DependencyUpdate GET = new DependencyUpdate();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public DependencyUpdate() {
             super("dependencyUpdate");
             withExecute((project) -> {
@@ -552,13 +514,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Help.GET);
+    }
     public static class Help extends Plugin {
         public static Help GET = new Help();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Help() {
             super("help");
             withExecute((project) -> {
@@ -571,13 +531,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(ResolveDependencies.GET);
+    }
     public static class ResolveDependencies extends Plugin {
         public static ResolveDependencies GET = new ResolveDependencies();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public ResolveDependencies() {
             super("resolveDependencies");
             withExecute((project) -> {
@@ -592,13 +550,11 @@ public class JPM {
         }
     }
 
+    static {
+        ROOT.pluginsAfter.add(Build.GET);
+    }
     public static class Build extends Plugin {
         public static Build GET = new Build();
-
-        static {
-            ROOT.pluginsAfter.add(GET);
-        }
-
         public Build() {
             super("build");
             withExecute((project) -> {
@@ -610,7 +566,8 @@ public class JPM {
     }
 
     //
-    // Add third party plugins below
+    // Add third party plugins below:
+    // (If you want to develop a plugin take a look at "Clean.class" further above to get started)
     //
 
 }
