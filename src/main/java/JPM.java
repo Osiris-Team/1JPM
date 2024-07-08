@@ -1,7 +1,4 @@
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
+import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -13,10 +10,10 @@ import java.util.stream.Stream;
 
 class ThisProject extends JPM.Project {
     static{
-        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy", (project) -> { // Register custom task
+        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
             //deployToServer(project); // If it throws an exception the whole build stops
         }));
-        JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("", (project) -> {
+        JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
             // Run something after/before another task
         }));
     }
@@ -43,19 +40,49 @@ class ThisProject extends JPM.Project {
 
 // 1JPM version 1.0.0 by Osiris-Team
 public class JPM {
+    public static void main(String[] args) throws Exception {
+        List<String> argList = new ArrayList<>(Arrays.asList(args));
+        if (argList.isEmpty()) {
+            System.out.println("Usage: java JPM.java <task>");
+            System.out.println("Use 'java JPM.java help' to see available tasks.");
+            return;
+        }
+
+        ThisProject thisProject = new ThisProject(argList);
+
+        // Check for verbose flag
+        boolean verbose = argList.remove("-v") || argList.remove("--verbose");
+        if (verbose) {
+            System.out.println("Verbose mode enabled");
+        }
+
+        for (String arg : argList) {
+            long startTime = System.currentTimeMillis();
+            thisProject.executeRootTask(arg);
+            long endTime = System.currentTimeMillis();
+            if (verbose) {
+                System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
+            }
+        }
+    }
+
     public static interface ConsumerWithException<T> extends Serializable {
         void accept(T t) throws Exception;
     }
 
     public static class Plugin {
         public String id;
-        public ConsumerWithException<Project> onExecute;
+        public ConsumerWithException<Project> onExecute = (project) -> {};
         public List<Plugin> pluginsBefore = new CopyOnWriteArrayList<>();
         public List<Plugin> pluginsAfter = new CopyOnWriteArrayList<>();
 
-        public Plugin(String id, ConsumerWithException<Project> onExecute) {
+        public Plugin(String id) {
             this.id = id;
-            this.onExecute = onExecute;
+        }
+
+        public Plugin withExecute(ConsumerWithException<Project> code){
+            this.onExecute = code;
+            return this;
         }
 
         public Plugin withPluginsBefore(Plugin... l) {
@@ -141,8 +168,7 @@ public class JPM {
         }
     }
 
-    public static final Plugin ROOT = new Plugin("root", project -> {
-    });
+    public static final Plugin ROOT = new Plugin("root");
 
     public static class Clean extends Plugin {
         public static Clean GET = new Clean();
@@ -152,7 +178,8 @@ public class JPM {
         }
 
         public Clean() {
-            super("clean", (project) -> {
+            super("clean");
+            withExecute((project) -> {
                 System.out.println("Cleaning build directory...");
                 Path buildPath = Paths.get(project.buildDir);
                 if (Files.exists(buildPath)) {
@@ -170,7 +197,8 @@ public class JPM {
         }
 
         public Compile() {
-            super("compile", (project) -> {
+            super("compile");
+            withExecute((project) -> {
                 System.out.println("Compiling Java source files...");
                 Files.createDirectories(Paths.get(project.classesDir));
 
@@ -196,7 +224,8 @@ public class JPM {
         }
 
         public ProcessResources() {
-            super("processResources", (project) -> {
+            super("processResources");
+            withExecute((project) -> {
                 System.out.println("Processing resource files...");
                 Path resourcesDir = Paths.get("src/main/resources");
                 Path outputDir = Paths.get(project.classesDir);
@@ -228,7 +257,8 @@ public class JPM {
         }
 
         public CompileTest() {
-            super("compileTest", (project) -> {
+            super("compileTest");
+            withExecute((project) -> {
                 System.out.println("Compiling test Java source files...");
                 Files.createDirectories(Paths.get(project.testClassesDir));
 
@@ -254,7 +284,8 @@ public class JPM {
         }
 
         public Test() {
-            super("test", (project) -> {
+            super("test");
+            withExecute((project) -> {
                 System.out.println("Running tests...");
                 List<String> command = new ArrayList<>(Arrays.asList(
                         "java", "-cp",
@@ -280,7 +311,8 @@ public class JPM {
         }
 
         public Jar() {
-            super("jar", (project) -> {
+            super("jar");
+            withExecute((project) -> {
                 System.out.println("Creating JAR file...");
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -314,7 +346,8 @@ public class JPM {
         }
 
         public FatJar() {
-            super("fatJar", (project) -> {
+            super("fatJar");
+            withExecute((project) -> {
                 System.out.println("Creating fat JAR...");
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -345,7 +378,8 @@ public class JPM {
         }
 
         public Dependencies() {
-            super("dependencies", (project) -> {
+            super("dependencies");
+            withExecute((project) -> {
                 System.out.println("Project dependencies:");
                 for (Dependency dep : project.dependencies) {
                     System.out.println("- " + dep);
@@ -362,12 +396,35 @@ public class JPM {
         }
 
         public DependencyUpdate() {
-            super("dependencyUpdate", (project) -> {
+            super("dependencyUpdate");
+            withExecute((project) -> {
                 System.out.println("Checking for dependency updates...");
-                // This is a placeholder. In a real-world scenario, you'd implement
-                // logic to check for newer versions of dependencies.
-                System.out.println("Feature not implemented: Please check manually for updates.");
+                for (Dependency dep : project.dependencies) {
+                    String latestVersion = getLatestVersion(dep);
+                    if (!latestVersion.equals(dep.version)) {
+                        System.out.println(dep + " can be updated to " + latestVersion);
+                    } else {
+                        System.out.println(dep + " is up to date");
+                    }
+                }
             });
+        }
+
+        private String getLatestVersion(Dependency dep) throws IOException {
+            String mavenMetadataUrl = String.format(
+                    "https://repo1.maven.org/maven2/%s/%s/maven-metadata.xml",
+                    dep.groupId.replace('.', '/'), dep.artifactId
+            );
+            URL url = new URL(mavenMetadataUrl);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.contains("<release>")) {
+                        return line.replaceAll(".*<release>(.*)</release>.*", "$1").trim();
+                    }
+                }
+            }
+            return dep.version; // Return current version if unable to find latest
         }
     }
 
@@ -379,7 +436,8 @@ public class JPM {
         }
 
         public Help() {
-            super("help", (project) -> {
+            super("help");
+            withExecute((project) -> {
                 System.out.println("Available tasks:");
                 for (Plugin plugin : ROOT.pluginsAfter) {
                     System.out.println("- " + plugin.id);
@@ -490,7 +548,8 @@ public class JPM {
         }
 
         public ResolveDependencies() {
-            super("resolveDependencies", (project) -> {
+            super("resolveDependencies");
+            withExecute((project) -> {
                 System.out.println("Resolving dependencies...");
                 Path libDir = Paths.get(project.libDir);
                 Files.createDirectories(libDir);
@@ -510,7 +569,8 @@ public class JPM {
         }
 
         public Build() {
-            super("build", (project) -> {
+            super("build");
+            withExecute((project) -> {
                 System.out.println("Building project...");
                 // This task doesn't need to do anything as it depends on other tasks
             });
@@ -518,29 +578,8 @@ public class JPM {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        List<String> argList = new ArrayList<>(Arrays.asList(args));
-        if (argList.isEmpty()) {
-            System.out.println("Usage: java JPM.java <task>");
-            System.out.println("Use 'java JPM.java help' to see available tasks.");
-            return;
-        }
+    //
+    // Add third party plugins below
+    //
 
-        ThisProject thisProject = new ThisProject(argList);
-
-        // Check for verbose flag
-        boolean verbose = argList.remove("-v") || argList.remove("--verbose");
-        if (verbose) {
-            System.out.println("Verbose mode enabled");
-        }
-
-        for (String arg : argList) {
-            long startTime = System.currentTimeMillis();
-            thisProject.executeRootTask(arg);
-            long endTime = System.currentTimeMillis();
-            if (verbose) {
-                System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
-            }
-        }
-    }
 }
