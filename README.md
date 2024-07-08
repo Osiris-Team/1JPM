@@ -17,6 +17,48 @@ everything in 1JPM is a plugin (even all tasks),
 and third-party plugins can be added simply by copying their Java code
 and appending it at the bottom of the 1JPM class (meaning creating an instance on the Plugin class, registers it automatically).
 
+```java
+class ThisProject extends JPM.Project {
+    static{
+        // Register third-party plugins here with:
+        // System.out.print(ThirdPartyPlugin.GET);
+
+        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
+            //deployToServer(project); // If it throws an exception the whole build stops
+        }));
+        JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
+            // Run something after/before another task, in this case after the "build" task
+        }));
+    }
+
+    public ThisProject(List<String> argList) {
+        // Override default configurations
+        this.groupId = "com.mycompany";
+        this.artifactId = "my-project";
+        this.version = "1.0.0";
+        this.mainClass = "com.mycompany.MyMainClass";
+        this.jarName = "my-project.jar";
+        this.fatJarName = "my-project-with-dependencies.jar";
+
+        // Add some example dependencies
+        addDependency("junit", "junit", "4.13.2");
+        addDependency("org.apache.commons", "commons-lang3", "3.12.0");
+        //implementation("org.apache.commons:commons-lang3:3.12.0"); // Same as above but similar to Gradle DSL
+
+        // Add some compiler arguments
+        addCompilerArg("-Xlint:unchecked");
+        addCompilerArg("-Xlint:deprecation");
+    }
+}
+
+
+// 1JPM version 1.0.1 by Osiris-Team
+public class JPM {
+  //...
+}
+```
+
+
 ## Progress
 1JPM is a comparatively new project, thus does not contain all the functionalities of the other
 major build tools like Maven and Gradle, however should provide the basic and most used functions.
@@ -25,27 +67,27 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
 ### `build` ✅
 
-- **`clean`**: Deletes the build directory.
-- **`compileJava`**: Compiles Java source files.
-    - Sub-task: `compileJava.options.compilerArgs`: Configures Java compiler arguments.
-- **`processResources`**: Processes resource files (e.g., copying them to the output directory).
-    - Sub-task: `processResources.expand(project.properties)`: Expands placeholders in resource files.
-- **`classes`**: Assembles the compiled classes (depends on `compileJava` and `processResources`).
+- **`clean`**: ✅ Deletes the build directory.
+- **`compileJava`**: ✅ Compiles Java source files.
+    - Sub-task: `compileJava.options.compilerArgs`: ✅ Configures Java compiler arguments.
+- **`processResources`**: ✅ Processes resource files (e.g., copying them to the output directory).
+    - Sub-task: `processResources.expand(project.properties)`: ✅ Expands placeholders in resource files.
+- **`classes`**: ✅ Assembles the compiled classes (depends on `compileJava` and `processResources`).
 - **`compileTestJava`**: Compiles test Java source files.
 - **`processTestResources`**: Processes test resource files.
 - **`testClasses`**: Assembles the compiled test classes (depends on `compileTestJava` and `processTestResources`).
 - **`test`**: Runs the unit tests (depends on `testClasses`).
     - Sub-task: `test.useJUnitPlatform()`: Configures JUnit Platform for testing.
-- **`jar`**: Assembles the JAR file.
-    - Sub-task: `jar.manifest`: Configures the JAR manifest.
+- **`jar`**: ✅ Assembles the JAR file.
+    - Sub-task: `jar.manifest`: ✅ Configures the JAR manifest.
 - **`javadoc`**: Generates Javadoc for the main source code.
-- **`assemble`**: Assembles the outputs of the project (depends on `classes` and `jar`).
+- **`assemble`**: ✅ Assembles the outputs of the project (depends on `classes` and `jar`).
 - **`check`**: Runs all checks (depends on `test`).
-- **`build`**: Aggregates all tasks needed to build the project (depends on `assemble` and `check`).
+- **`build`**: ✅ Aggregates all tasks needed to build the project (depends on `assemble` and `check`).
 
 ### `clean` ✅
 
-- **`clean`**: Deletes the build directory.
+- **`clean`**: ✅ Deletes the build directory.
 - **`cleanTask`**: Deletes the output of a specific task (e.g., `cleanJar`, `cleanTest`).
 
 ### `test` (Future release)
@@ -60,12 +102,12 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
 ### `assemble` ✅
 
-- **`compileJava`**: Compiles Java source files.
-- **`processResources`**: Processes resource files.
-- **`classes`**: Assembles the compiled classes.
-- **`jar`**: Assembles the JAR file.
-- **`shadowJar`**: Creates a fat JAR with all dependencies (requires Shadow plugin).
-- **`assemble`**: Aggregates `classes` and `jar` tasks.
+- **`compileJava`**: ✅ Compiles Java source files.
+- **`processResources`**: ✅ Processes resource files.
+- **`classes`**: ✅ Assembles the compiled classes.
+- **`jar`**: ✅ Assembles the JAR file.
+- **`fatJar`**: ✅ Creates a fat JAR with all dependencies (requires Shadow plugin).
+- **`assemble`**: ✅ Aggregates `classes` and `jar` tasks.
 
 ### `check` (Future release)
 
@@ -86,20 +128,20 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
 ### `help` ✅
 
-- **`help`**: Displays help information about the available tasks and command-line options.
+- **`help`**: ✅ Displays help information about the available tasks and command-line options.
 - **`components`**: Displays the components produced by the project.
 
 ### `tasks` ✅
 
-- **`tasks`**: Lists the tasks in the project.
+- **`tasks`**: ✅ Lists the tasks in the project.
 - **`tasks --all`**: Lists all tasks, including task dependencies.
 
 ### `jar` ✅
 
-- **`compileJava`**: Compiles Java source files.
-- **`processResources`**: Processes resource files.
-- **`classes`**: Assembles the compiled classes.
-- **`jar`**: Assembles the JAR file.
+- **`compileJava`**: ✅ Compiles Java source files.
+- **`processResources`**: ✅ Processes resource files.
+- **`classes`**: ✅ Assembles the compiled classes.
+- **`jar`**: ✅ Assembles the JAR file.
     - Sub-task: `jar.manifest.attributes`: Sets manifest attributes.
     - Sub-task: `jar.from`: Includes additional files in the JAR.
 

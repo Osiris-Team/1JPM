@@ -10,11 +10,14 @@ import java.util.stream.Stream;
 
 class ThisProject extends JPM.Project {
     static{
+        // Register third-party plugins here with:
+        // System.out.print(ThirdPartyPlugin.GET);
+
         JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
             //deployToServer(project); // If it throws an exception the whole build stops
         }));
         JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
-            // Run something after/before another task
+            // Run something after/before another task, in this case after the "build" task
         }));
     }
 
@@ -30,6 +33,7 @@ class ThisProject extends JPM.Project {
         // Add some example dependencies
         addDependency("junit", "junit", "4.13.2");
         addDependency("org.apache.commons", "commons-lang3", "3.12.0");
+        //implementation("org.apache.commons:commons-lang3:3.12.0"); // Same as above but similar to Gradle DSL
 
         // Add some compiler arguments
         addCompilerArg("-Xlint:unchecked");
@@ -41,8 +45,9 @@ class ThisProject extends JPM.Project {
 // 1JPM version 1.0.1 by Osiris-Team
 public class JPM {
     public static final Plugin ROOT = new Plugin("root");
+
     static{
-        // Register all plugins/tasks, add your third party plugins here too
+        // Register all internal plugins/tasks
         System.out.print(Clean.GET);
         System.out.print(Compile.GET);
         System.out.print(ProcessResources.GET);
@@ -57,6 +62,7 @@ public class JPM {
         System.out.print(Build.GET);
         System.out.println();
     }
+
     public static void main(String[] args) throws Exception {
         List<String> argList = new ArrayList<>(Arrays.asList(args));
         if (argList.isEmpty()) {
@@ -75,6 +81,10 @@ public class JPM {
         }
         System.out.println("All relevant files can be found inside /build at "+thisProject.buildDir);
     }
+
+    //
+    // API and Models
+    //
 
     public static interface ConsumerWithException<T> extends Serializable {
         void accept(T t) throws Exception;
@@ -169,6 +179,12 @@ public class JPM {
             System.out.println("Unknown task: " + task);
         }
 
+        public void implementation(String s){
+            String[] split = s.split(":");
+            if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
+            addDependency(split[0], split[1], split[2]);
+        }
+
         public void addDependency(String groupId, String artifactId, String version) {
             dependencies.add(new Dependency(groupId, artifactId, version));
         }
@@ -177,6 +193,106 @@ public class JPM {
             compilerArgs.add(arg);
         }
     }
+
+    //
+    // Utility methods
+    //
+
+    private static void deleteDirectory(Path path) throws IOException {
+        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    private static List<String> getSourceFiles(String directory) throws IOException {
+        try (Stream<Path> walk = Files.walk(Paths.get(directory))) {
+            return walk.filter(Files::isRegularFile)
+                    .map(Path::toString)
+                    .filter(f -> f.endsWith(".java"))
+                    .collect(Collectors.toList());
+        }
+    }
+
+    private static void runCommand(List<String> command) throws IOException, InterruptedException {
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.inheritIO();
+        Process process = processBuilder.start();
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new RuntimeException("Command failed with exit code: " + exitCode);
+        }
+    }
+
+    private static void addToJar(JarOutputStream jos, Path sourceDir, String parentPath) throws IOException {
+        Files.walk(sourceDir)
+                .filter(Files::isRegularFile)
+                .forEach(file -> {
+                    try {
+                        String entryName = parentPath + sourceDir.relativize(file).toString().replace('\\', '/');
+                        jos.putNextEntry(new JarEntry(entryName));
+                        Files.copy(file, jos);
+                        jos.closeEntry();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+    private static void addJarToFatJar(JarOutputStream jos, Path jarPath) throws IOException {
+        try (JarInputStream jis = new JarInputStream(Files.newInputStream(jarPath))) {
+            JarEntry entry;
+            while ((entry = jis.getNextJarEntry()) != null) {
+                if (!entry.isDirectory() && !entry.getName().startsWith("META-INF")) {
+                    jos.putNextEntry(new JarEntry(entry.getName()));
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = jis.read(buffer)) != -1) {
+                        jos.write(buffer, 0, bytesRead);
+                    }
+                    jos.closeEntry();
+                }
+            }
+        }
+    }
+
+    private static List<String> getClasspath(Project project) throws IOException {
+        List<String> classpath = new ArrayList<>();
+        Path libDir = Paths.get(project.libDir);
+        if (Files.exists(libDir)) {
+            try (Stream<Path> walk = Files.walk(libDir)) {
+                classpath.addAll(walk.filter(file -> file.toString().endsWith(".jar")).map(Path::toString)
+                        .collect(Collectors.toList()));
+            }
+        }
+        return classpath;
+    }
+
+    private static void downloadDependency(Dependency dep, Path libDir) throws IOException {
+        String mavenRepoUrl = "https://repo1.maven.org/maven2/";
+        String artifactPath = dep.groupId.replace('.', '/') + '/' + dep.artifactId + '/' + dep.version + '/' +
+                dep.artifactId + '-' + dep.version + ".jar";
+        URL url = new URL(mavenRepoUrl + artifactPath);
+        Path targetPath = libDir.resolve(dep.artifactId + '-' + dep.version + ".jar");
+
+        System.out.println("Downloading: " + url);
+        try (InputStream in = url.openStream()) {
+            Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    //
+    // Internal plugins
+    //
 
     public static class Clean extends Plugin {
         public static Clean GET = new Clean();
@@ -452,99 +568,6 @@ public class JPM {
                 }
                 System.out.println("\nUse 'java JPM.java <task>' to run a task.");
             });
-        }
-    }
-
-    // Utility methods
-    private static void deleteDirectory(Path path) throws IOException {
-        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                Files.delete(dir);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-    }
-
-    private static List<String> getSourceFiles(String directory) throws IOException {
-        try (Stream<Path> walk = Files.walk(Paths.get(directory))) {
-            return walk.filter(Files::isRegularFile)
-                    .map(Path::toString)
-                    .filter(f -> f.endsWith(".java"))
-                    .collect(Collectors.toList());
-        }
-    }
-
-    private static void runCommand(List<String> command) throws IOException, InterruptedException {
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
-        processBuilder.inheritIO();
-        Process process = processBuilder.start();
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new RuntimeException("Command failed with exit code: " + exitCode);
-        }
-    }
-
-    private static void addToJar(JarOutputStream jos, Path sourceDir, String parentPath) throws IOException {
-        Files.walk(sourceDir)
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try {
-                        String entryName = parentPath + sourceDir.relativize(file).toString().replace('\\', '/');
-                        jos.putNextEntry(new JarEntry(entryName));
-                        Files.copy(file, jos);
-                        jos.closeEntry();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-    }
-
-    private static void addJarToFatJar(JarOutputStream jos, Path jarPath) throws IOException {
-        try (JarInputStream jis = new JarInputStream(Files.newInputStream(jarPath))) {
-            JarEntry entry;
-            while ((entry = jis.getNextJarEntry()) != null) {
-                if (!entry.isDirectory() && !entry.getName().startsWith("META-INF")) {
-                    jos.putNextEntry(new JarEntry(entry.getName()));
-                    byte[] buffer = new byte[1024];
-                    int bytesRead;
-                    while ((bytesRead = jis.read(buffer)) != -1) {
-                        jos.write(buffer, 0, bytesRead);
-                    }
-                    jos.closeEntry();
-                }
-            }
-        }
-    }
-
-    private static List<String> getClasspath(Project project) throws IOException {
-        List<String> classpath = new ArrayList<>();
-        Path libDir = Paths.get(project.libDir);
-        if (Files.exists(libDir)) {
-            try (Stream<Path> walk = Files.walk(libDir)) {
-                classpath.addAll(walk.filter(file -> file.toString().endsWith(".jar")).map(Path::toString)
-                        .collect(Collectors.toList()));
-            }
-        }
-        return classpath;
-    }
-
-    private static void downloadDependency(Dependency dep, Path libDir) throws IOException {
-        String mavenRepoUrl = "https://repo1.maven.org/maven2/";
-        String artifactPath = dep.groupId.replace('.', '/') + '/' + dep.artifactId + '/' + dep.version + '/' +
-                dep.artifactId + '-' + dep.version + ".jar";
-        URL url = new URL(mavenRepoUrl + artifactPath);
-        Path targetPath = libDir.resolve(dep.artifactId + '-' + dep.version + ".jar");
-
-        System.out.println("Downloading: " + url);
-        try (InputStream in = url.openStream()) {
-            Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
