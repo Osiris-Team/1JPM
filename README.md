@@ -23,7 +23,7 @@ major build tools like Maven and Gradle, however should provide the basic and mo
 
 Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
-### `build` (Planned)
+### `build` ✅
 
 - **`clean`**: Deletes the build directory.
 - **`compileJava`**: Compiles Java source files.
@@ -43,7 +43,7 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 - **`check`**: Runs all checks (depends on `test`).
 - **`build`**: Aggregates all tasks needed to build the project (depends on `assemble` and `check`).
 
-### `clean` (Planned)
+### `clean` ✅
 
 - **`clean`**: Deletes the build directory.
 - **`cleanTask`**: Deletes the output of a specific task (e.g., `cleanJar`, `cleanTest`).
@@ -58,7 +58,7 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
     - Sub-task: `test.exclude`: Specifies which test classes to exclude.
 - **`integrationTest`**: Runs integration tests (custom task, needs configuration).
 
-### `assemble` (Planned)
+### `assemble` ✅
 
 - **`compileJava`**: Compiles Java source files.
 - **`processResources`**: Processes resource files.
@@ -84,17 +84,17 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 - **`dependencyInsight`**: Shows insight into a specific dependency.
 - **`dependencyUpdates`**: Checks for dependency updates (requires Versions plugin).
 
-### `help` (Planned)
+### `help` ✅
 
 - **`help`**: Displays help information about the available tasks and command-line options.
 - **`components`**: Displays the components produced by the project.
 
-### `tasks` (Planned)
+### `tasks` ✅
 
 - **`tasks`**: Lists the tasks in the project.
 - **`tasks --all`**: Lists all tasks, including task dependencies.
 
-### `jar` (Planned)
+### `jar` ✅
 
 - **`compileJava`**: Compiles Java source files.
 - **`processResources`**: Processes resource files.
