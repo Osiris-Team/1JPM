@@ -40,6 +40,23 @@ class ThisProject extends JPM.Project {
 
 // 1JPM version 1.0.0 by Osiris-Team
 public class JPM {
+    public static final Plugin ROOT = new Plugin("root");
+    static{
+        // Register all plugins/tasks, add your third party plugins here too
+        System.out.print(Clean.GET);
+        System.out.print(Compile.GET);
+        System.out.print(ProcessResources.GET);
+        System.out.print(CompileTest.GET);
+        System.out.print(Test.GET);
+        System.out.print(Jar.GET);
+        System.out.print(FatJar.GET);
+        System.out.print(Dependencies.GET);
+        System.out.print(DependencyUpdate.GET);
+        System.out.print(Help.GET);
+        System.out.print(ResolveDependencies.GET);
+        System.out.print(Build.GET);
+        System.out.println();
+    }
     public static void main(String[] args) throws Exception {
         List<String> argList = new ArrayList<>(Arrays.asList(args));
         if (argList.isEmpty()) {
@@ -48,21 +65,13 @@ public class JPM {
             return;
         }
 
+        // Execute tasks
         ThisProject thisProject = new ThisProject(argList);
-
-        // Check for verbose flag
-        boolean verbose = argList.remove("-v") || argList.remove("--verbose");
-        if (verbose) {
-            System.out.println("Verbose mode enabled");
-        }
-
         for (String arg : argList) {
             long startTime = System.currentTimeMillis();
             thisProject.executeRootTask(arg);
             long endTime = System.currentTimeMillis();
-            if (verbose) {
-                System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
-            }
+            System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
         }
     }
 
@@ -72,7 +81,7 @@ public class JPM {
 
     public static class Plugin {
         public String id;
-        public ConsumerWithException<Project> onExecute = (project) -> {};
+        public ConsumerWithException<Project> execute = (project) -> {};
         public List<Plugin> pluginsBefore = new CopyOnWriteArrayList<>();
         public List<Plugin> pluginsAfter = new CopyOnWriteArrayList<>();
 
@@ -81,7 +90,7 @@ public class JPM {
         }
 
         public Plugin withExecute(ConsumerWithException<Project> code){
-            this.onExecute = code;
+            this.execute = code;
             return this;
         }
 
@@ -109,7 +118,7 @@ public class JPM {
             for (Plugin plugin : pluginsBefore) {
                 plugin.execute(project);
             }
-            onExecute.accept(project);
+            execute.accept(project);
             for (Plugin plugin : pluginsAfter) {
                 plugin.execute(project);
             }
@@ -167,8 +176,6 @@ public class JPM {
             compilerArgs.add(arg);
         }
     }
-
-    public static final Plugin ROOT = new Plugin("root");
 
     public static class Clean extends Plugin {
         public static Clean GET = new Clean();
