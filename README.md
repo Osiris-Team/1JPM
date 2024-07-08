@@ -2,19 +2,19 @@
 1 Java Project Manager (1JPM), is a Maven/Gradle alternative with a twist. 
 It's a single Java file itself, which should be edited by you to configure your project.
 
-Meaning instead of writing XML (Maven) or Groovy (Gradle), your build file is Java code too.
+Meaning instead of writing XML (Maven) or Groovy (Gradle), your build file is Java plugin too.
 **To be more exact, you download/copy the 1JPM class file into your project, open a terminal and execute:**
 
 - Java 11 and above: `java JPM.java build`
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM build`
 - Earlier Java versions are not supported.
 
-to build your project (`build` is a task, which compiles and creates jar file from your code).
+to build your project (`build` is a task, which compiles and creates jar file from your plugin).
 If you want to include dependencies in the jar run `build-fat` instead.
 
 1JPM works in a very similar way to Gradle, however
 everything in 1JPM is a plugin (even all tasks), 
-and third-party plugins can be added simply by copying their Java code
+and third-party plugins can be added simply by copying their Java plugin
 and appending it at the bottom of the 1JPM class (meaning creating an instance on the Plugin class, registers it automatically).
 
 ## Progress
@@ -22,8 +22,6 @@ and appending it at the bottom of the 1JPM class (meaning creating an instance o
 major build tools like Maven and Gradle, however should provide the basic and most used functions.
 
 Below you can see some Gradle tasks that are available in 1JPM (or planned).
-
-# Comprehensive Gradle Tasks List
 
 ### `build` (Planned)
 
@@ -40,7 +38,7 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
     - Sub-task: `test.useJUnitPlatform()`: Configures JUnit Platform for testing.
 - **`jar`**: Assembles the JAR file.
     - Sub-task: `jar.manifest`: Configures the JAR manifest.
-- **`javadoc`**: Generates Javadoc for the main source code.
+- **`javadoc`**: Generates Javadoc for the main source plugin.
 - **`assemble`**: Assembles the outputs of the project (depends on `classes` and `jar`).
 - **`check`**: Runs all checks (depends on `test`).
 - **`build`**: Aggregates all tasks needed to build the project (depends on `assemble` and `check`).
@@ -75,8 +73,8 @@ Below you can see some Gradle tasks that are available in 1JPM (or planned).
 - **`processTestResources`**: Processes test resource files.
 - **`testClasses`**: Assembles the compiled test classes.
 - **`test`**: Runs the unit tests.
-- **`checkstyle`**: Runs Checkstyle for code style checks (requires Checkstyle plugin).
-- **`pmdMain`**: Runs PMD for static code analysis (requires PMD plugin).
+- **`checkstyle`**: Runs Checkstyle for plugin style checks (requires Checkstyle plugin).
+- **`pmdMain`**: Runs PMD for static plugin analysis (requires PMD plugin).
 - **`spotbugsMain`**: Runs SpotBugs for bug detection (requires SpotBugs plugin).
 - **`check`**: Aggregates all verification tasks, including `test`, `checkstyle`, `pmdMain`, and `spotbugsMain`.
 

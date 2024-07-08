@@ -4,6 +4,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -23,9 +24,9 @@ class ThisProject extends JPM {
 
     @Override
     public void start(List<String> args) {
-        JPM.add("deploy", () -> { // Register custom task
+        JPM.root.pluginsAfter.add(new Plugin("deploy", () -> { // Register custom task
             deployToServer(); // If it throws an exception the whole build stops
-        });
+        }));
     }
 
     // Override build method to add custom steps
@@ -49,41 +50,31 @@ class ThisProject extends JPM {
 
 // 1JPM version 1.0.0 by Osiris-Team
 public class JPM {
-    public interface Code extends Serializable{
+    public static interface RunnableWithException extends Serializable{
         void run() throws Exception;
     }
-    private static final Map<String, List<Code>> commandsAndCode = new ConcurrentHashMap<>();
+    public static class Plugin{
+        public String id;
+        public RunnableWithException code;
+        public List<Plugin> pluginsBefore = new ArrayList<>();
+        public List<Plugin> pluginsAfter = new ArrayList<>();
 
-    public static void add(String command, Code code){
-        synchronized (commandsAndCode){
-            List<Code> l = commandsAndCode.get(command);
-            if(l == null) l = new ArrayList<>();
-            l.add(code);
-            commandsAndCode.put(command, l);
+        public Plugin(String id, RunnableWithException code) {
+            this.id = id;
+            this.code = code;
+        }
+
+        public void execute() throws Exception{
+            for (Plugin plugin : pluginsBefore) {
+                plugin.execute();
+            }
+            code.run();
+            for (Plugin plugin : pluginsAfter) {
+                plugin.execute();
+            }
         }
     }
-
-    public static void put(String command, Code code){
-        synchronized (commandsAndCode){
-            List<Code> l = new ArrayList<>();
-            l.add(code);
-            commandsAndCode.put(command, l);
-        }
-    }
-
-    public static void remove(String command){
-        synchronized (commandsAndCode){
-            commandsAndCode.remove(command);
-        }
-    }
-
-    public static void remove(Code code){
-        synchronized (commandsAndCode){
-            commandsAndCode.forEach((command1, list1) -> {
-                list1.remove(code);
-            });
-        }
-    }
+    public static final Plugin root = new Plugin("root", () -> {});
 
     public static void main(String[] args_) throws Exception {
         List<String> args = new ArrayList<>();
@@ -95,12 +86,12 @@ public class JPM {
         }
 
         ThisProject thisProject = new ThisProject();
-        add("clean", thisProject::clean);
-        add("compile", thisProject::compile);
-        add("test-compile", thisProject::testCompile);
-        add("test", thisProject::test);
-        add("build", thisProject::build);
-        add("build-fat", thisProject::buildFat);
+        root.pluginsAfter.add(new Plugin("clean", thisProject::clean));
+        root.pluginsAfter.add(new Plugin("compile", thisProject::compile));
+        root.pluginsAfter.add(new Plugin("test-compile", thisProject::testCompile));
+        root.pluginsAfter.add(new Plugin("test", thisProject::test));
+        root.pluginsAfter.add(new Plugin("build", thisProject::build));
+        root.pluginsAfter.add(new Plugin("build-fat", thisProject::buildFat));
 
         thisProject.start(args);
         for (String arg : args) {
@@ -122,16 +113,13 @@ public class JPM {
     };
 
     protected void executeTask(String task) throws Exception {
-        if(!commandsAndCode.containsKey(task)) {
-            System.out.println("Unknown task: " + task);
-            return;
+        for (Plugin plugin : root.pluginsAfter) {
+            if(plugin.id.equals("task")){
+                plugin.execute();
+                return;
+            }
         }
-        for (String command : commandsAndCode.keySet()) {
-            if(task.equals(command))
-                for (Code code : commandsAndCode.get(command)) {
-                    code.run();
-                }
-        }
+        System.out.println("Unknown task: " + task);
     }
 
     protected void clean() throws IOException {
