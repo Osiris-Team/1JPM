@@ -19,40 +19,37 @@ and third-party plugins can be added simply by appending their Java code at the 
 
 ```java
 class ThisProject extends JPM.Project {
-    static{
-        // Register third-party plugins here with:
-        // System.out.print(ThirdPartyPlugin.GET);
+  static{
+    JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
+      //deployToServer(project); // If it throws an exception the whole build stops
+    }));
+    JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
+      // Run something after/before another task, in this case after the "build" task
+    }));
+  }
 
-        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
-            //deployToServer(project); // If it throws an exception the whole build stops
-        }));
-        JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
-            // Run something after/before another task, in this case after the "build" task
-        }));
-    }
+  public ThisProject(List<String> argList) {
+    // Override default configurations
+    this.groupId = "com.mycompany";
+    this.artifactId = "my-project";
+    this.version = "1.0.0";
+    this.mainClass = "com.mycompany.MyMainClass";
+    this.jarName = "my-project.jar";
+    this.fatJarName = "my-project-with-dependencies.jar";
 
-    public ThisProject(List<String> argList) {
-        // Override default configurations
-        this.groupId = "com.mycompany";
-        this.artifactId = "my-project";
-        this.version = "1.0.0";
-        this.mainClass = "com.mycompany.MyMainClass";
-        this.jarName = "my-project.jar";
-        this.fatJarName = "my-project-with-dependencies.jar";
+    // Add some example dependencies
+    addDependency("junit", "junit", "4.13.2");
+    addDependency("org.apache.commons", "commons-lang3", "3.12.0");
+    //implementation("org.apache.commons:commons-lang3:3.12.0"); // Same as above but similar to Gradle DSL
 
-        // Add some example dependencies
-        addDependency("junit", "junit", "4.13.2");
-        addDependency("org.apache.commons", "commons-lang3", "3.12.0");
-        //implementation("org.apache.commons:commons-lang3:3.12.0"); // Same as above but similar to Gradle DSL
-
-        // Add some compiler arguments
-        addCompilerArg("-Xlint:unchecked");
-        addCompilerArg("-Xlint:deprecation");
-    }
+    // Add some compiler arguments
+    addCompilerArg("-Xlint:unchecked");
+    addCompilerArg("-Xlint:deprecation");
+  }
 }
 
 
-// 1JPM version 1.0.1 by Osiris-Team
+// 1JPM version 1.0.2 by Osiris-Team
 public class JPM {
   //...
 }
