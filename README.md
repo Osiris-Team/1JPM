@@ -23,8 +23,6 @@ major build tools like Maven and Gradle, however should provide the basic and mo
 
 Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
-# Comprehensive Gradle Tasks List
-
 ### `build` (Planned)
 
 - **`clean`**: Deletes the build directory.
