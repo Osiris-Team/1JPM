@@ -329,12 +329,21 @@ public class JPM {
         }
     }
 
-    public static List<String> getClasspath(Project project) throws IOException {
+    public static String getClasspathString(Project project, String... additionalPaths) throws IOException {
+        return String.join(File.pathSeparator, getClasspath(project));
+    }
+
+    public static List<String> getClasspath(Project project, String... additionalPaths) throws IOException {
         List<String> classpath = new ArrayList<>();
+        if(additionalPaths != null)
+            for (String additionalPath : additionalPaths) {
+                classpath.add(additionalPath.replace("\\", "/"));
+            }
+
         Path libDir = Paths.get(project.libDir);
         if (Files.exists(libDir)) {
             try (Stream<Path> walk = Files.walk(libDir)) {
-                classpath.addAll(walk.filter(file -> file.toString().endsWith(".jar")).map(Path::toString)
+                classpath.addAll(walk.filter(file -> file.toString().endsWith(".jar")).map(path -> path.toString().replace("\\", "/"))
                         .collect(Collectors.toList()));
             }
         }
@@ -428,11 +437,11 @@ public class JPM {
                 Files.createDirectories(Paths.get(project.classesDir));
 
                 List<String> sourceFiles = getSourceFiles(project.srcDir);
+
                 List<String> compileCommand = new ArrayList<>(Arrays.asList(
-                        "javac", "-d", project.classesDir
+                        "javac", "-d", project.classesDir, "-cp", getClasspathString(project)
                 ));
                 compileCommand.addAll(project.compilerArgs);
-                compileCommand.addAll(getClasspath(project));
                 compileCommand.addAll(sourceFiles);
 
                 runCommand(compileCommand);
@@ -486,7 +495,7 @@ public class JPM {
                 List<String> sourceFiles = getSourceFiles(project.testSrcDir);
                 List<String> compileCommand = new ArrayList<>(Arrays.asList(
                         "javac", "-d", project.testClassesDir, "-cp",
-                        project.classesDir + File.pathSeparator + String.join(File.pathSeparator, getClasspath(project))
+                        getClasspathString(project, project.classesDir)
                 ));
                 compileCommand.addAll(project.compilerArgs);
                 compileCommand.addAll(sourceFiles);
@@ -507,10 +516,7 @@ public class JPM {
             withExecute((project) -> {
                 System.out.println("Running tests...");
                 List<String> command = new ArrayList<>(Arrays.asList(
-                        "java", "-cp",
-                        project.classesDir + File.pathSeparator +
-                                project.testClassesDir + File.pathSeparator +
-                                String.join(File.pathSeparator, getClasspath(project)),
+                        "java", "-cp", getClasspathString(project, project.classesDir, project.testClassesDir),
                         "org.junit.platform.console.ConsoleLauncher",
                         "--scan-classpath",
                         "--reports-dir=" + project.buildDir + "/test-results"
