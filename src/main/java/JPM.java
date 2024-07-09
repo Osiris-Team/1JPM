@@ -7,6 +7,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.jar.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.security.*;
+import java.util.concurrent.*;
+import java.util.regex.*;
+import javax.xml.parsers.*;
+import org.w3c.dom.*;
 
 class ThisProject extends JPM.Project {
     static{
@@ -18,7 +23,7 @@ class ThisProject extends JPM.Project {
         }));
     }
 
-    public ThisProject(List<String> argList) {
+    public ThisProject(List<String> args) {
         // Override default configurations
         this.groupId = "com.mycompany";
         this.artifactId = "my-project";
@@ -36,10 +41,20 @@ class ThisProject extends JPM.Project {
         addCompilerArg("-Xlint:unchecked");
         addCompilerArg("-Xlint:deprecation");
     }
+
+    public static void main(String[] args) throws Exception {
+        JPM.main(args);
+    }
+}
+
+class ThirdPartyPlugins extends JPM.Plugins{
+    // Add third party plugins below:
+    // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
 
-// 1JPM version 1.0.2 by Osiris-Team
+// 1JPM version 1.0.3 by Osiris-Team
+// To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final Plugin ROOT = new Plugin("root");
 
@@ -51,6 +66,9 @@ public class JPM {
             return;
         }
 
+        // Load third party plugins
+        new ThirdPartyPlugins();
+
         // Execute tasks
         ThisProject thisProject = new ThisProject(argList);
         for (String arg : argList) {
@@ -59,7 +77,7 @@ public class JPM {
             long endTime = System.currentTimeMillis();
             System.out.println("Task '" + arg + "' completed in " + (endTime - startTime) + "ms");
         }
-        System.out.println("All relevant files can be found inside /build at "+thisProject.buildDir);
+        System.out.println("All relevant files can be found inside /build at "+Paths.get(thisProject.buildDir));
     }
 
     //
@@ -116,20 +134,86 @@ public class JPM {
         }
     }
 
+    public static class Plugins {
+    }
+
     public static class Dependency {
         public String groupId;
         public String artifactId;
         public String version;
+        public String scope;
+        public List<Dependency> transitiveDependencies;
 
         public Dependency(String groupId, String artifactId, String version) {
+            this(groupId, artifactId, version, "compile", new ArrayList<>());
+        }
+
+        public Dependency(String groupId, String artifactId, String version, String scope) {
+            this(groupId, artifactId, version, scope, new ArrayList<>());
+        }
+
+        public Dependency(String groupId, String artifactId, String version, String scope, List<Dependency> transitiveDependencies) {
             this.groupId = groupId;
             this.artifactId = artifactId;
             this.version = version;
+            this.scope = scope;
+            this.transitiveDependencies = transitiveDependencies;
         }
 
         @Override
         public String toString() {
-            return groupId + ":" + artifactId + ":" + version;
+            return groupId + ":" + artifactId + ":" + version + ":" + scope;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Dependency that = (Dependency) o;
+            return Objects.equals(groupId, that.groupId) &&
+                    Objects.equals(artifactId, that.artifactId) &&
+                    Objects.equals(version, that.version) &&
+                    Objects.equals(scope, that.scope);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(groupId, artifactId, version, scope);
+        }
+    }
+
+    public static class VersionRange {
+        private final String lowerBound;
+        private final boolean lowerInclusive;
+        private final String upperBound;
+        private final boolean upperInclusive;
+
+        public VersionRange(String range) {
+            Pattern pattern = Pattern.compile("([\\[\\(])([^,]+),([^\\]\\)]+)([\\]\\)])");
+            Matcher matcher = pattern.matcher(range);
+            if (matcher.matches()) {
+                lowerInclusive = "[".equals(matcher.group(1));
+                lowerBound = matcher.group(2);
+                upperBound = matcher.group(3);
+                upperInclusive = "]".equals(matcher.group(4));
+            } else {
+                lowerInclusive = true;
+                lowerBound = range;
+                upperBound = null;
+                upperInclusive = true;
+            }
+        }
+
+        public boolean includes(String version) {
+            int lowerComparison = compareVersions(version, lowerBound);
+            if (lowerComparison < 0 || (!lowerInclusive && lowerComparison == 0)) {
+                return false;
+            }
+            if (upperBound == null) {
+                return true;
+            }
+            int upperComparison = compareVersions(version, upperBound);
+            return upperComparison < 0 || (upperInclusive && upperComparison == 0);
         }
     }
 
@@ -178,7 +262,7 @@ public class JPM {
     // Utility methods
     //
 
-    private static void deleteDirectory(Path path) throws IOException {
+    public static void deleteDirectory(Path path) throws IOException {
         Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -194,7 +278,7 @@ public class JPM {
         });
     }
 
-    private static List<String> getSourceFiles(String directory) throws IOException {
+    public static List<String> getSourceFiles(String directory) throws IOException {
         try (Stream<Path> walk = Files.walk(Paths.get(directory))) {
             return walk.filter(Files::isRegularFile)
                     .map(Path::toString)
@@ -203,7 +287,7 @@ public class JPM {
         }
     }
 
-    private static void runCommand(List<String> command) throws IOException, InterruptedException {
+    public static void runCommand(List<String> command) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.inheritIO();
         Process process = processBuilder.start();
@@ -213,7 +297,7 @@ public class JPM {
         }
     }
 
-    private static void addToJar(JarOutputStream jos, Path sourceDir, String parentPath) throws IOException {
+    public static void addToJar(JarOutputStream jos, Path sourceDir, String parentPath) throws IOException {
         Files.walk(sourceDir)
                 .filter(Files::isRegularFile)
                 .forEach(file -> {
@@ -228,7 +312,7 @@ public class JPM {
                 });
     }
 
-    private static void addJarToFatJar(JarOutputStream jos, Path jarPath) throws IOException {
+    public static void addJarToFatJar(JarOutputStream jos, Path jarPath) throws IOException {
         try (JarInputStream jis = new JarInputStream(Files.newInputStream(jarPath))) {
             JarEntry entry;
             while ((entry = jis.getNextJarEntry()) != null) {
@@ -245,7 +329,7 @@ public class JPM {
         }
     }
 
-    private static List<String> getClasspath(Project project) throws IOException {
+    public static List<String> getClasspath(Project project) throws IOException {
         List<String> classpath = new ArrayList<>();
         Path libDir = Paths.get(project.libDir);
         if (Files.exists(libDir)) {
@@ -257,7 +341,8 @@ public class JPM {
         return classpath;
     }
 
-    private static void downloadDependency(Dependency dep, Path libDir) throws IOException {
+    @Deprecated
+    public static void downloadDependency(Dependency dep, Path libDir) throws IOException {
         String mavenRepoUrl = "https://repo1.maven.org/maven2/";
         String artifactPath = dep.groupId.replace('.', '/') + '/' + dep.artifactId + '/' + dep.version + '/' +
                 dep.artifactId + '-' + dep.version + ".jar";
@@ -268,6 +353,46 @@ public class JPM {
         try (InputStream in = url.openStream()) {
             Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    public static byte[] readAllBytes(InputStream inputStream) throws IOException {
+        final int bufLen = 1024;
+        byte[] buf = new byte[bufLen];
+        int readLen;
+        IOException exception = null;
+
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            while ((readLen = inputStream.read(buf, 0, bufLen)) != -1)
+                outputStream.write(buf, 0, readLen);
+
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            exception = e;
+            throw e;
+        } finally {
+            if (exception == null) inputStream.close();
+            else try {
+                inputStream.close();
+            } catch (IOException e) {
+                exception.addSuppressed(e);
+            }
+        }
+    }
+
+    public static int compareVersions(String v1, String v2) {
+        String[] parts1 = v1.split("\\.");
+        String[] parts2 = v2.split("\\.");
+        int length = Math.max(parts1.length, parts2.length);
+        for (int i = 0; i < length; i++) {
+            int p1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
+            int p2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+            if (p1 != p2) {
+                return Integer.compare(p1, p2);
+            }
+        }
+        return 0;
     }
 
     //
@@ -536,17 +661,468 @@ public class JPM {
     }
     public static class ResolveDependencies extends Plugin {
         public static ResolveDependencies GET = new ResolveDependencies();
+        public static final String MAVEN_CENTRAL = "https://repo1.maven.org/maven2/";
+        public static final Set<String> REPOSITORIES = new LinkedHashSet<>(Arrays.asList(MAVEN_CENTRAL));
+        public static final Map<String, Dependency> DEPENDENCY_CACHE = new ConcurrentHashMap<>();
+        public static final Map<String, String> VERSION_CACHE = new ConcurrentHashMap<>();
+        public static final Path LOCAL_REPO = Paths.get(System.getProperty("user.home"), ".m2", "repository");
+
         public ResolveDependencies() {
             super("resolveDependencies");
             withExecute((project) -> {
-                System.out.println("Resolving dependencies...");
-                Path libDir = Paths.get(project.libDir);
-                Files.createDirectories(libDir);
-
-                for (Dependency dep : project.dependencies) {
-                    downloadDependency(dep, libDir);
-                }
+                updateCentralIndex();
+                resolveDependencies(project);
+                handleMultiProjectBuild(project);
+                generateDependencyReport(new HashSet<>(project.dependencies), Paths.get(project.buildDir, "dependency-report.txt"));
             });
+        }
+
+        protected void resolveDependencies(Project project) throws Exception {
+            System.out.println("Resolving dependencies...");
+            Path libDir = Paths.get(project.libDir);
+            Files.createDirectories(libDir);
+
+            Set<Dependency> resolvedDependencies = new LinkedHashSet<>();
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+            for (Dependency dep : project.dependencies) {
+                futures.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        resolveDependencyTree(dep, resolvedDependencies, new LinkedHashSet<>(), "compile", new LinkedHashSet<>(REPOSITORIES));
+                    } catch (Exception e) {
+                        throw new CompletionException(e);
+                    }
+                }));
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+            handleDependencyConflicts(resolvedDependencies);
+
+            for (Dependency dep : resolvedDependencies) {
+                downloadDependency(dep, libDir);
+            }
+
+            generateBuildSignature(resolvedDependencies, project);
+        }
+
+        protected void resolveDependencyTree(Dependency dep, Set<Dependency> resolvedDependencies, Set<String> visitedDeps, String scope, Set<String> currentRepositories) throws Exception {
+            String depKey = dep.toString();
+            if (visitedDeps.contains(depKey)) return;
+            visitedDeps.add(depKey);
+
+            Dependency cachedDep = DEPENDENCY_CACHE.get(depKey);
+            if (cachedDep != null) {
+                resolvedDependencies.add(cachedDep);
+                return;
+            }
+
+            String pomContent = downloadPom(dep, currentRepositories);
+            Document pomDoc = parsePom(pomContent);
+            String resolvedVersion = resolveVersion(dep, pomContent, pomDoc);
+            dep.version = resolvedVersion;
+
+            // Parse repositories before resolving transitive dependencies
+            Set<String> updatedRepositories = new HashSet<>(currentRepositories);
+            updatedRepositories.addAll(parseRepositories(pomDoc));
+
+            List<Dependency> transitiveDeps = parseTransitiveDependencies(pomContent, pomDoc);
+
+            Dependency resolvedDep = new Dependency(dep.groupId, dep.artifactId, resolvedVersion, dep.scope, transitiveDeps);
+            DEPENDENCY_CACHE.put(depKey, resolvedDep);
+
+            if ("compile".equals(scope) || "runtime".equals(scope)) {
+                resolvedDependencies.add(resolvedDep);
+            }
+
+            for (Dependency transitiveDep : transitiveDeps) {
+                resolveDependencyTree(transitiveDep, resolvedDependencies, visitedDeps, transitiveDep.scope, updatedRepositories);
+            }
+        }
+
+        protected String downloadPom(Dependency dep, Set<String> repositories) throws IOException {
+            Path localPomPath = getLocalArtifactPath(dep, "pom");
+            if (Files.exists(localPomPath)) {
+                return new String(Files.readAllBytes(localPomPath));
+            }
+
+            for (String repo : repositories) {
+                String pomUrl = String.format("%s%s/%s/%s/%s-%s.pom",
+                        repo, dep.groupId.replace('.', '/'), dep.artifactId, dep.version, dep.artifactId, dep.version);
+                try {
+                    URL url = new URL(pomUrl);
+                    try (InputStream in = url.openStream()) {
+                        byte[] pomBytes = readAllBytes(in);
+                        Files.createDirectories(localPomPath.getParent());
+                        Files.write(localPomPath, pomBytes);
+                        return new String(pomBytes);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Failed to fetch dependency from url: "+pomUrl);
+                    // Try next repository
+                }
+            }
+            throw new IOException("POM not found for " + dep);
+        }
+
+        protected Set<String> parseRepositories(Document pomDoc) {
+            Set<String> newRepositories = new HashSet<>();
+            NodeList repositoryNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "repository");
+
+            for (int i = 0; i < repositoryNodes.getLength(); i++) {
+                Element repoElement = (Element) repositoryNodes.item(i);
+                String url = getElementContent(repoElement, "url");
+                if (url != null && !url.isEmpty()) {
+                    if (!url.endsWith("/")) {
+                        url += "/";
+                    }
+                    newRepositories.add(url);
+                }
+            }
+
+            return newRepositories;
+        }
+
+        protected Document parsePom(String pomContent) throws Exception {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true); // Enable namespace awareness
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            return builder.parse(new ByteArrayInputStream(pomContent.getBytes()));
+        }
+
+        protected String resolveVersion(Dependency dep, String pomContent, Document pomDoc) {
+            if (!dep.version.startsWith("${") && !dep.version.startsWith("[") && !dep.version.contains(",")) {
+                return dep.version;
+            }
+
+            String cacheKey = dep.groupId + ":" + dep.artifactId + ":" + dep.version;
+            String cachedVersion = VERSION_CACHE.get(cacheKey);
+            if (cachedVersion != null) {
+                return cachedVersion;
+            }
+
+            String resolvedVersion;
+            if (dep.version.startsWith("${")) {
+                resolvedVersion = resolvePropertyVersion(dep.version, pomDoc);
+            } else {
+                List<String> availableVersions = getAvailableVersions(pomDoc);
+                resolvedVersion = resolveVersionRange(dep.version, availableVersions);
+            }
+
+            if (resolvedVersion == null) {
+                System.out.println(pomContent);
+                throw new RuntimeException("Unable to resolve version for dependency: " + dep);
+            }
+
+            VERSION_CACHE.put(cacheKey, resolvedVersion);
+            return resolvedVersion;
+        }
+
+        protected String resolvePropertyVersion(String propertyRef, Document pomDoc) {
+            String propertyName = propertyRef.substring(2, propertyRef.length() - 1);
+            NodeList propertiesNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "properties");
+
+            for (int i = 0; i < propertiesNodes.getLength(); i++) {
+                Element propertiesElement = (Element) propertiesNodes.item(i);
+                NodeList propertyNodes = propertiesElement.getChildNodes();
+
+                for (int j = 0; j < propertyNodes.getLength(); j++) {
+                    Node propertyNode = propertyNodes.item(j);
+                    if (propertyNode.getNodeType() == Node.ELEMENT_NODE &&
+                            propertyNode.getLocalName().equals(propertyName)) {
+                        return propertyNode.getTextContent().trim();
+                    }
+                }
+            }
+
+            // If property not found in properties, check project version
+            if ("project.version".equals(propertyName)) {
+                NodeList versionNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "version");
+                if (versionNodes.getLength() > 0) {
+                    return versionNodes.item(0).getTextContent().trim();
+                }
+            }
+
+            throw new RuntimeException("Property not found: " + propertyName);
+        }
+
+        protected List<String> getAvailableVersions(Document pomDoc) {
+            List<String> availableVersions = new ArrayList<>();
+            NodeList versionElements = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "version");
+            for (int i = 0; i < versionElements.getLength(); i++) {
+                availableVersions.add(versionElements.item(i).getTextContent().trim());
+            }
+            return availableVersions;
+        }
+
+        protected List<Dependency> parseTransitiveDependencies(String pomContent, Document pomDoc) {
+            List<Dependency> deps = new ArrayList<>();
+            NodeList dependencyNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "dependency");
+
+            // Parse dependencyManagement section first
+            Map<String, String> managedVersions = parseDependencyManagement(pomDoc);
+
+            for (int i = 0; i < dependencyNodes.getLength(); i++) {
+                Element depElement = (Element) dependencyNodes.item(i);
+                String groupId = getElementContent(depElement, "groupId");
+                String artifactId = getElementContent(depElement, "artifactId");
+                String version = getElementContent(depElement, "version");
+                String scope = getElementContent(depElement, "scope");
+                boolean optional = Boolean.parseBoolean(getElementContent(depElement, "optional"));
+
+                if (!optional) {
+                    // If version is null, check in managedVersions
+                    if (version == null) {
+                        String key = groupId + ":" + artifactId;
+                        version = managedVersions.get(key);
+                    }
+
+                    if (version != null) {
+                        if (version.startsWith("${")) {
+                            version = resolvePropertyVersion(version, pomDoc);
+                        }
+                        deps.add(new Dependency(groupId, artifactId, version, scope));
+                    } else {
+                        System.out.println(pomContent);
+                        System.out.println("Warning: No version found for dependency " + groupId + ":" + artifactId);
+                    }
+                }
+            }
+            return deps;
+        }
+
+        protected Map<String, String> parseDependencyManagement(Document pomDoc) {
+            Map<String, String> managedVersions = new HashMap<>();
+            NodeList dependencyManagementNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "dependencyManagement");
+
+            if (dependencyManagementNodes.getLength() > 0) {
+                Element dependencyManagementElement = (Element) dependencyManagementNodes.item(0);
+                NodeList managedDependencyNodes = dependencyManagementElement.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "dependency");
+
+                for (int i = 0; i < managedDependencyNodes.getLength(); i++) {
+                    Element depElement = (Element) managedDependencyNodes.item(i);
+                    String groupId = getElementContent(depElement, "groupId");
+                    String artifactId = getElementContent(depElement, "artifactId");
+                    String version = getElementContent(depElement, "version");
+
+                    if (groupId != null && artifactId != null && version != null) {
+                        String key = groupId + ":" + artifactId;
+                        managedVersions.put(key, version);
+                    }
+                }
+            }
+
+            return managedVersions;
+        }
+
+        protected String getElementContent(Element parent, String tagName) {
+            NodeList elements = parent.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", tagName);
+            return elements.getLength() > 0 ? elements.item(0).getTextContent().trim() : null;
+        }
+
+        protected void downloadDependency(Dependency dep, Path libDir) throws IOException {
+            Path localJarPath = getLocalArtifactPath(dep, "jar");
+            Path targetPath = libDir.resolve(dep.artifactId + '-' + dep.version + ".jar");
+
+            if (Files.exists(localJarPath)) {
+                Files.copy(localJarPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                return;
+            }
+
+            if (Files.exists(targetPath)) return;
+
+            for (String repo : REPOSITORIES) {
+                String jarUrl = String.format("%s%s/%s/%s/%s-%s.jar",
+                        repo, dep.groupId.replace('.', '/'), dep.artifactId, dep.version, dep.artifactId, dep.version);
+                try {
+                    URL url = new URL(jarUrl);
+                    System.out.println("Downloading: " + url);
+                    try (InputStream in = url.openStream()) {
+                        byte[] jarBytes = readAllBytes(in);
+                        Files.createDirectories(localJarPath.getParent());
+                        Files.write(localJarPath, jarBytes);
+                        Files.copy(localJarPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    verifyChecksum(dep, "jar");
+                    return;
+                } catch (FileNotFoundException e) {
+                    // Try next repository
+                }
+            }
+            throw new IOException("JAR not found for " + dep);
+        }
+
+        protected Path getLocalArtifactPath(Dependency dep, String extension) {
+            System.out.println(dep);
+            return LOCAL_REPO.resolve(
+                            dep.groupId.replace('.', File.separatorChar))
+                    .resolve(dep.artifactId)
+                    .resolve(dep.version)
+                    .resolve(dep.artifactId + "-" + dep.version + "." + extension);
+        }
+
+        protected void verifyChecksum(Dependency dep, String extension) throws IOException {
+            Path artifactPath = getLocalArtifactPath(dep, extension);
+            Path checksumPath = Paths.get(artifactPath.toString() + ".sha1");
+
+            if (!Files.exists(checksumPath)) {
+                downloadChecksum(dep, extension);
+            }
+
+            String expectedChecksum = new String(Files.readAllBytes(checksumPath)).trim();
+            String actualChecksum = calculateSHA1(artifactPath);
+
+            if (!expectedChecksum.equals(actualChecksum)) {
+                throw new IOException("Checksum verification failed for " + dep);
+            }
+        }
+
+        protected void downloadChecksum(Dependency dep, String extension) throws IOException {
+            for (String repo : REPOSITORIES) {
+                String checksumUrl = String.format("%s%s/%s/%s/%s-%s.%s.sha1",
+                        repo, dep.groupId.replace('.', '/'), dep.artifactId, dep.version, dep.artifactId, dep.version, extension);
+                try {
+                    URL url = new URL(checksumUrl);
+                    Path checksumPath = getLocalArtifactPath(dep, extension + ".sha1");
+                    try (InputStream in = url.openStream()) {
+                        Files.copy(in, checksumPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    return;
+                } catch (FileNotFoundException e) {
+                    // Try next repository
+                }
+            }
+            throw new IOException("Checksum not found for " + dep);
+        }
+
+        protected String calculateSHA1(Path file) throws IOException {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-1");
+                byte[] fileBytes = Files.readAllBytes(file);
+                byte[] hashBytes = digest.digest(fileBytes);
+                StringBuilder sb = new StringBuilder();
+                for (byte b : hashBytes) {
+                    sb.append(String.format("%02x", b));
+                }
+                return sb.toString();
+            } catch (NoSuchAlgorithmException e) {
+                throw new IOException("SHA-1 algorithm not available", e);
+            }
+        }
+
+        protected void handleDependencyConflicts(Set<Dependency> dependencies) {
+            Map<String, Dependency> latestVersions = new HashMap<>();
+            for (Dependency dep : dependencies) {
+                String key = dep.groupId + ":" + dep.artifactId;
+                Dependency existing = latestVersions.get(key);
+                if (existing == null || compareVersions(dep.version, existing.version) > 0) {
+                    latestVersions.put(key, dep);
+                }
+            }
+            dependencies.clear();
+            dependencies.addAll(latestVersions.values());
+        }
+
+        protected void generateBuildSignature(Set<Dependency> dependencies, Project project) throws Exception {
+            List<String> depStrings = dependencies.stream()
+                    .map(Dependency::toString)
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            String dependenciesString = String.join("\n", depStrings);
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(dependenciesString.getBytes());
+            String signature = Base64.getEncoder().encodeToString(digest);
+
+            Path signaturePath = Paths.get(project.buildDir, "build-signature.txt");
+            Files.write(signaturePath, signature.getBytes());
+            System.out.println("Build signature generated: " + signature);
+        }
+
+        protected String resolveVersionRange(String versionRange, List<String> availableVersions) {
+            VersionRange range = new VersionRange(versionRange);
+            return availableVersions.stream()
+                    .filter(range::includes)
+                    .max(JPM::compareVersions)
+                    .orElseThrow(() -> new RuntimeException("No version satisfies range: " + versionRange));
+        }
+
+        protected void handleMultiProjectBuild(Project rootProject) throws Exception {
+            List<Project> allProjects = new ArrayList<>();
+            allProjects.add(rootProject);
+            allProjects.addAll(findSubprojects(rootProject));
+
+            for (Project project : allProjects) {
+                resolveDependencies(project);
+            }
+
+            // Resolve inter-project dependencies
+            for (Project project : allProjects) {
+                for (Dependency dep : project.dependencies) {
+                    Project dependencyProject = findProjectByArtifact(allProjects, dep);
+                    if (dependencyProject != null) {
+                        // Replace the dependency with the project's output
+                        replaceWithProjectOutput(project, dep, dependencyProject);
+                    }
+                }
+            }
+        }
+
+        protected List<Project> findSubprojects(Project rootProject) {
+            // Implementation depends on your project structure
+            // This is a placeholder implementation
+            return new ArrayList<>();
+        }
+
+        protected Project findProjectByArtifact(List<Project> projects, Dependency dep) {
+            return projects.stream()
+                    .filter(p -> p.groupId.equals(dep.groupId) && p.artifactId.equals(dep.artifactId))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        protected void replaceWithProjectOutput(Project project, Dependency dep, Project dependencyProject) {
+            // Implementation depends on your build system
+            // This is a placeholder implementation
+            System.out.println("Replacing " + dep + " with output from " + dependencyProject.artifactId);
+        }
+
+        protected void cacheArtifactLocally(Dependency dep, Path artifactPath) throws IOException {
+            Path localPath = getLocalArtifactPath(dep, "jar");
+            Files.createDirectories(localPath.getParent());
+            Files.copy(artifactPath, localPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        protected boolean isArtifactCached(Dependency dep) {
+            Path localPath = getLocalArtifactPath(dep, "jar");
+            return Files.exists(localPath);
+        }
+
+        protected void updateCentralIndex() throws Exception {
+            // In a real implementation, this would download and parse the Maven Central Index
+            // For simplicity, we'll just print a message
+            System.out.println("Updating central index...");
+        }
+
+        protected void cleanLocalRepository() throws IOException {
+            System.out.println("Cleaning local repository...");
+            Files.walk(LOCAL_REPO)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        }
+
+        protected void generateDependencyReport(Set<Dependency> dependencies, Path reportPath) throws IOException {
+            List<String> reportLines = new ArrayList<>();
+            reportLines.add("Dependency Report");
+            reportLines.add("==================");
+            for (Dependency dep : dependencies) {
+                reportLines.add(dep.toString());
+                for (Dependency transitive : dep.transitiveDependencies) {
+                    reportLines.add("  ├─ " + transitive.toString());
+                }
+            }
+            Files.write(reportPath, reportLines);
         }
     }
 
@@ -564,10 +1140,4 @@ public class JPM {
             withPluginsBefore(ResolveDependencies.GET, Compile.GET, ProcessResources.GET, CompileTest.GET, Test.GET, Jar.GET);
         }
     }
-
-    //
-    // Add third party plugins below:
-    // (If you want to develop a plugin take a look at "Clean.class" further above to get started)
-    //
-
 }

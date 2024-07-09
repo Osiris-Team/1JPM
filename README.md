@@ -10,7 +10,9 @@ Meaning instead of writing XML (Maven) or Groovy (Gradle), your build file is Ja
 - Earlier Java versions are not supported
 
 to build your project (`build` is a task, which compiles and creates a jar file from your code).
-If you want to include dependencies in the jar run `build-fat` instead.
+If you want to include dependencies in the jar run `fatJar` instead.
+
+Note that most IDEs only provide auto-complete and
 
 1JPM works in a very similar way to Gradle, however
 everything in 1JPM is a plugin (even all its tasks), 
