@@ -685,6 +685,8 @@ public class JPM {
             });
         }
 
+        protected final Object lock = new Object();
+
         protected void resolveDependencies(Project project) throws Exception {
             System.out.println("Resolving dependencies...");
             Path libDir = Paths.get(project.libDir);
@@ -697,7 +699,21 @@ public class JPM {
                 resolveDependencyTree(futures, dep, resolvedDependencies, new LinkedHashSet<>(), new LinkedHashSet<>(REPOSITORIES));
             }
 
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            int maxSeconds = 600 * 3;
+            for (int i = 0; i < maxSeconds; i++) {
+                Thread.sleep(1000);
+                boolean isAllDone = true;
+                for (CompletableFuture<Void> f : futures) {
+                    if(!f.isDone()) {
+                        isAllDone = false;
+                        break;
+                    }
+                }
+                if(isAllDone) break;
+            }
+            for (CompletableFuture<Void> f : futures) {
+                if(!f.isDone()) throw new Exception("There is still a task running after "+maxSeconds+" seconds. Terminated due to timeout reached.");
+            }
 
             handleDependencyConflicts(resolvedDependencies);
 
@@ -708,23 +724,26 @@ public class JPM {
             generateBuildSignature(resolvedDependencies, project);
         }
 
-        protected void resolveDependencyTree(List<CompletableFuture<Void>> futures, Dependency dep, Set<Dependency> resolvedDependencies, Set<String> visitedDeps, Set<String> currentRepositories) throws Exception {
+        protected void resolveDependencyTree(List<CompletableFuture<Void>> futures, Dependency dep,
+                                             Set<Dependency> resolvedDependencies, Set<String> visitedDeps, Set<String> currentRepositories) {
             futures.add(CompletableFuture.runAsync(() -> {
                 try{
-                    String depKey = dep.toString();
-                    if (visitedDeps.contains(depKey)) {
-                        if (!resolvedDependencies.contains(dep)) {
-                            System.out.println("Already resolved dependency detected (possibly circular): " + depKey);
+                    synchronized (lock){
+                        String depKey = dep.toString();
+                        if (visitedDeps.contains(depKey)) {
+                            if (!resolvedDependencies.contains(dep)) {
+                                System.out.println("Already resolved dependency detected (possibly circular): " + depKey);
+                                return;
+                            }
                             return;
                         }
-                        return;
-                    }
-                    visitedDeps.add(depKey);
+                        visitedDeps.add(depKey);
 
-                    Dependency cachedDep = DEPENDENCY_CACHE.get(depKey);
-                    if (cachedDep != null) {
-                        resolvedDependencies.add(cachedDep);
-                        return;
+                        Dependency cachedDep = DEPENDENCY_CACHE.get(depKey);
+                        if (cachedDep != null) {
+                            resolvedDependencies.add(cachedDep);
+                            return;
+                        }
                     }
 
                     String pomContent = downloadPom(dep, currentRepositories);
@@ -741,12 +760,14 @@ public class JPM {
                         resolveVersion(tDep, pomContent, pomDoc, resolvedDependencies, visitedDeps, currentRepositories);
                     }
 
-                    dep.transitiveDependencies = transitiveDeps;
-                    DEPENDENCY_CACHE.put(depKey, dep);
-
-                    if(dep.scope == null) dep.scope = "compile";
-                    if ("compile".equals(dep.scope) || "runtime".equals(dep.scope)) {
-                        resolvedDependencies.add(dep);
+                    synchronized (lock){
+                        dep.transitiveDependencies = transitiveDeps;
+                        if(dep.scope == null) dep.scope = "compile";
+                        String depKey = dep.toString();
+                        DEPENDENCY_CACHE.put(depKey, dep);
+                        if (!dep.scope.equals("import")) {
+                            resolvedDependencies.add(dep);
+                        }
                     }
 
                     for (Dependency transitiveDep : transitiveDeps) {
@@ -1338,12 +1359,18 @@ public class JPM {
             reportLines.add("Dependency Report");
             reportLines.add("==================");
             for (Dependency dep : dependencies) {
-                reportLines.add(dep.toString());
-                for (Dependency transitive : dep.transitiveDependencies) {
-                    reportLines.add("  ├─ " + transitive.toString());
-                }
+                reportLines.addAll(generateDependencyReport1("", dep));
             }
             Files.write(reportPath, reportLines);
+        }
+
+        protected List<String> generateDependencyReport1(String spaces, Dependency dep) throws IOException {
+            List<String> reportLines = new ArrayList<>();
+            reportLines.add(spaces + dep.toString());
+            for (Dependency transitive : dep.transitiveDependencies) {
+                reportLines.addAll(generateDependencyReport1(spaces + "    ", transitive));
+            }
+            return reportLines;
         }
     }
 
