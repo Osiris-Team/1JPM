@@ -14,8 +14,8 @@ If you want to include dependencies in the jar run `fatJar` instead.
 
 1JPM works in a very similar way to Gradle, however
 everything in 1JPM is a plugin (even all its tasks), 
-and third-party plugins can be added simply by appending their Java code at the bottom of the JPM class
-(must be written in Java 8 and not use external dependencies).
+and third-party plugins can be added simply by appending their Java code inside ThirdPartyPlugins
+(these must be written in Java 8 and not use external dependencies).
 
 ```java
 class ThisProject extends JPM.Project {
@@ -68,12 +68,19 @@ public class JPM {
 ```
 
 ## Why a single file?
+
+#### Pros
 - IDEs should provide decent auto-complete when JPM.java is in the project root (where your pom.xml/build.gradle)
 usually is.
 - To access all your IDEs fancy features, you can also add JPM.java to ./src/main/java.
 This also grants the rest of your project easy access to its data, like your projects version for example.
 Just make sure that your working dir is still at ./ when executing tasks.
 - Simple drag and drop installation.
+
+#### Cons / Todo
+- Developing plugins is tricky since you can't really use third-party dependencies at the moment.
+A workaround for this would be developing a task like "minifyProject" which would merge a complete project into 1 line of code,
+including any dependencies used.
 
 ## Progress
 1JPM is a new project and currently an early-access/beta release,
