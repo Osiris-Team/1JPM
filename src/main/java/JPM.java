@@ -1,4 +1,5 @@
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -11,6 +12,7 @@ import java.security.*;
 import java.util.concurrent.*;
 import java.util.regex.*;
 import javax.xml.parsers.*;
+
 import org.w3c.dom.*;
 
 class ThisProject extends JPM.Project {
@@ -692,13 +694,7 @@ public class JPM {
             List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             for (Dependency dep : project.dependencies) {
-                futures.add(CompletableFuture.runAsync(() -> {
-                    try {
-                        resolveDependencyTree(dep, resolvedDependencies, new LinkedHashSet<>(), "compile", new LinkedHashSet<>(REPOSITORIES));
-                    } catch (Exception e) {
-                        throw new CompletionException(e);
-                    }
-                }));
+                resolveDependencyTree(futures, dep, resolvedDependencies, new LinkedHashSet<>(), new LinkedHashSet<>(REPOSITORIES));
             }
 
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -712,43 +708,61 @@ public class JPM {
             generateBuildSignature(resolvedDependencies, project);
         }
 
-        protected void resolveDependencyTree(Dependency dep, Set<Dependency> resolvedDependencies, Set<String> visitedDeps, String scope, Set<String> currentRepositories) throws Exception {
-            String depKey = dep.toString();
-            if (visitedDeps.contains(depKey)) return;
-            visitedDeps.add(depKey);
+        protected void resolveDependencyTree(List<CompletableFuture<Void>> futures, Dependency dep, Set<Dependency> resolvedDependencies, Set<String> visitedDeps, Set<String> currentRepositories) throws Exception {
+            futures.add(CompletableFuture.runAsync(() -> {
+                try{
+                    String depKey = dep.toString();
+                    if (visitedDeps.contains(depKey)) {
+                        if (!resolvedDependencies.contains(dep)) {
+                            System.out.println("Already resolved dependency detected (possibly circular): " + depKey);
+                            return;
+                        }
+                        return;
+                    }
+                    visitedDeps.add(depKey);
 
-            Dependency cachedDep = DEPENDENCY_CACHE.get(depKey);
-            if (cachedDep != null) {
-                resolvedDependencies.add(cachedDep);
-                return;
-            }
+                    Dependency cachedDep = DEPENDENCY_CACHE.get(depKey);
+                    if (cachedDep != null) {
+                        resolvedDependencies.add(cachedDep);
+                        return;
+                    }
 
-            String pomContent = downloadPom(dep, currentRepositories);
-            Document pomDoc = parsePom(pomContent);
-            String resolvedVersion = resolveVersion(dep, pomContent, pomDoc);
-            dep.version = resolvedVersion;
+                    String pomContent = downloadPom(dep, currentRepositories);
+                    if(pomContent.isEmpty()) return;
+                    Document pomDoc = parsePom(dep, pomContent);
+                    resolveVersion(dep, pomContent, pomDoc, resolvedDependencies, visitedDeps, currentRepositories);
 
-            // Parse repositories before resolving transitive dependencies
-            Set<String> updatedRepositories = new HashSet<>(currentRepositories);
-            updatedRepositories.addAll(parseRepositories(pomDoc));
+                    // Parse repositories before resolving transitive dependencies
+                    Set<String> updatedRepositories = new HashSet<>(currentRepositories);
+                    updatedRepositories.addAll(parseRepositories(pomDoc));
 
-            List<Dependency> transitiveDeps = parseTransitiveDependencies(pomContent, pomDoc);
+                    List<Dependency> transitiveDeps = getDependenciesUnsafe(pomDoc);
+                    for (Dependency tDep : transitiveDeps) {
+                        resolveVersion(tDep, pomContent, pomDoc, resolvedDependencies, visitedDeps, currentRepositories);
+                    }
 
-            Dependency resolvedDep = new Dependency(dep.groupId, dep.artifactId, resolvedVersion, dep.scope, transitiveDeps);
-            DEPENDENCY_CACHE.put(depKey, resolvedDep);
+                    dep.transitiveDependencies = transitiveDeps;
+                    DEPENDENCY_CACHE.put(depKey, dep);
 
-            if ("compile".equals(scope) || "runtime".equals(scope)) {
-                resolvedDependencies.add(resolvedDep);
-            }
+                    if(dep.scope == null) dep.scope = "compile";
+                    if ("compile".equals(dep.scope) || "runtime".equals(dep.scope)) {
+                        resolvedDependencies.add(dep);
+                    }
 
-            for (Dependency transitiveDep : transitiveDeps) {
-                resolveDependencyTree(transitiveDep, resolvedDependencies, visitedDeps, transitiveDep.scope, updatedRepositories);
-            }
+                    for (Dependency transitiveDep : transitiveDeps) {
+                        resolveDependencyTree(futures, transitiveDep, resolvedDependencies, visitedDeps, updatedRepositories);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error while 'resolveDependencyTree' for "+dep);
+                    throw new CompletionException(e);
+                }
+            }));
         }
 
         protected String downloadPom(Dependency dep, Set<String> repositories) throws IOException {
             Path localPomPath = getLocalArtifactPath(dep, "pom");
             if (Files.exists(localPomPath)) {
+                System.out.println("Successfully fetched from cache: "+localPomPath);
                 return new String(Files.readAllBytes(localPomPath));
             }
 
@@ -757,27 +771,66 @@ public class JPM {
                         repo, dep.groupId.replace('.', '/'), dep.artifactId, dep.version, dep.artifactId, dep.version);
                 try {
                     URL url = new URL(pomUrl);
-                    try (InputStream in = url.openStream()) {
-                        byte[] pomBytes = readAllBytes(in);
-                        Files.createDirectories(localPomPath.getParent());
-                        Files.write(localPomPath, pomBytes);
-                        return new String(pomBytes);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setInstanceFollowRedirects(true);
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        try (InputStream in = conn.getInputStream()) {
+                            byte[] pomBytes = readAllBytes(in);
+                            Files.createDirectories(localPomPath.getParent());
+                            Files.write(localPomPath, pomBytes);
+                            System.out.println("Successfully fetched from: " + pomUrl);
+                            return new String(pomBytes);
+                        }
+                    } else if (responseCode == HttpURLConnection.HTTP_MOVED_PERM
+                            || responseCode == HttpURLConnection.HTTP_MOVED_TEMP
+                            || responseCode == HttpURLConnection.HTTP_SEE_OTHER) {
+                        String newUrl = conn.getHeaderField("Location");
+                        System.out.println("Redirected to: " + newUrl);
+                        // Recursively call the method with the new URL
+                        return downloadPomFromUrl(new URL(newUrl), localPomPath);
+                    } else {
+                        System.out.println("Failed to fetch dependency from URL: " + pomUrl + ". Response code: " + responseCode);
                     }
                 } catch (Exception e) {
-                    System.out.println("Failed to fetch dependency from url: "+pomUrl);
+                    System.out.println("Error fetching dependency from URL: " + pomUrl + ". " + e.getMessage());
                     // Try next repository
                 }
             }
+            if(dep.scope != null && dep.scope.equals("provided")){
+                System.err.println("POM not found ignored since its scope is 'provided' for " + dep);
+                return "";
+            }
             throw new IOException("POM not found for " + dep);
+        }
+
+        private String downloadPomFromUrl(URL url, Path localPomPath) throws IOException {
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setInstanceFollowRedirects(true);
+
+            try (InputStream in = conn.getInputStream()) {
+                byte[] pomBytes = readAllBytes(in);
+                Files.createDirectories(localPomPath.getParent());
+                Files.write(localPomPath, pomBytes);
+                return new String(pomBytes);
+            }
         }
 
         protected Set<String> parseRepositories(Document pomDoc) {
             Set<String> newRepositories = new HashSet<>();
             NodeList repositoryNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "repository");
-
+            List<Element> els = new ArrayList<>();
             for (int i = 0; i < repositoryNodes.getLength(); i++) {
-                Element repoElement = (Element) repositoryNodes.item(i);
-                String url = getElementContent(repoElement, "url");
+                els.add((Element) repositoryNodes.item(i));
+            }
+            NodeList snapshotRepositoryNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "snapshotRepository");
+            for (int i = 0; i < snapshotRepositoryNodes.getLength(); i++) {
+                els.add((Element) snapshotRepositoryNodes.item(i));
+            }
+
+            for (Element el : els) {
+                String url = getElementContent(el, "url");
                 if (url != null && !url.isEmpty()) {
                     if (!url.endsWith("/")) {
                         url += "/";
@@ -785,53 +838,138 @@ public class JPM {
                     newRepositories.add(url);
                 }
             }
-
             return newRepositories;
         }
 
-        protected Document parsePom(String pomContent) throws Exception {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true); // Enable namespace awareness
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            return builder.parse(new ByteArrayInputStream(pomContent.getBytes()));
+        protected Document parsePom(Dependency dep, String pomContent) throws Exception {
+            try{
+                DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                factory.setNamespaceAware(true); // Enable namespace awareness
+                DocumentBuilder builder = factory.newDocumentBuilder();
+                return builder.parse(new ByteArrayInputStream(pomContent.getBytes()));
+            } catch (Exception e) {
+                System.err.println("Error while 'parsePom' for "+dep);
+                System.err.println("Content of pom.xml (with "+pomContent.length()+" chars): \n"+pomContent);
+                throw e;
+            }
         }
 
-        protected String resolveVersion(Dependency dep, String pomContent, Document pomDoc) {
+        protected void resolveVersion(Dependency dep, String pomContent, Document pomDoc, Set<Dependency> resolvedDependencies, Set<String> visitedDeps, Set<String> currentRepositories) {
+            if(dep.version == null) { // VERSION EMPTY
+                // Check parent pom if dep exists inside it and try to retrieve version from there
+                NodeList parentNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "parent");
+                if (parentNodes.getLength() <= 0) {
+                    throw new NoParentException("Dep "+dep+" does not contain <parent> element! Content: \n"+pomContent);
+                }
+                Element parentElement = (Element) parentNodes.item(0);
+                String parentGroupId = getElementContent(parentElement, "groupId");
+                String parentArtifactId = getElementContent(parentElement, "artifactId");
+                String parentVersion = getElementContent(parentElement, "version");
+                try {
+                    // Hope that the parent contains the version property
+                    if(parentGroupId.equals("org.apache.maven") && parentArtifactId.equals("maven-parent"))
+                        throw new NoParentException("Reached maven-parent, thus went through all parents without finding the version!");
+                    Dependency parentDep = new Dependency(parentGroupId, parentArtifactId, parentVersion);
+                    String parentPomContent = downloadPom(parentDep, currentRepositories);
+                    if(parentPomContent.isEmpty()) throw new NullPointerException(parentPomContent);
+                    Document parentPomDoc = parsePom(parentDep, parentPomContent);
+                    if(parentArtifactId.equals("surefire") && dep.artifactId.equals("common-junit48"))
+                        System.out.println("WOWS");
+                    List<Dependency> dependencies = getDependenciesUnsafe(parentPomDoc);
+                    for (Dependency depInParent : dependencies) {
+                        if(depInParent.groupId.equals(dep.groupId) && depInParent.artifactId.equals(dep.artifactId)){
+                            resolveVersion(depInParent, parentPomContent, parentPomDoc, resolvedDependencies, visitedDeps, currentRepositories);
+                            dep.version = depInParent.version;
+                            break;
+                        }
+                    }
+                    if(dep.version == null){
+                        // Go one up and try parent of parent (until there is no parent left)
+                        resolveVersion(dep, parentPomContent, parentPomDoc, resolvedDependencies, visitedDeps, currentRepositories);
+                        return;
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Error resolving dependency ("+dep+") version from parent POM ("+parentGroupId+":"+parentArtifactId+":"+parentVersion+")", e);
+                }
+                return;
+            }
+
             if (!dep.version.startsWith("${") && !dep.version.startsWith("[") && !dep.version.contains(",")) {
-                return dep.version;
+                return;
             }
 
             String cacheKey = dep.groupId + ":" + dep.artifactId + ":" + dep.version;
             String cachedVersion = VERSION_CACHE.get(cacheKey);
             if (cachedVersion != null) {
-                return cachedVersion;
+                dep.version = cachedVersion;
+                return;
             }
 
             String resolvedVersion;
             if (dep.version.startsWith("${")) {
-                resolvedVersion = resolvePropertyVersion(dep.version, pomDoc);
+                resolvedVersion = resolveVersionFromProperty(dep, dep.version, pomContent, pomDoc);
             } else {
                 List<String> availableVersions = getAvailableVersions(pomDoc);
+                Map<String, String> managedVersions = parseDependencyManagement(pomDoc);
+                String key = dep.groupId + ":" + dep.artifactId;
+                String priorityVersion = managedVersions.get(key);
+                if(priorityVersion != null) availableVersions.add(priorityVersion);
                 resolvedVersion = resolveVersionRange(dep.version, availableVersions);
             }
 
-            if (resolvedVersion == null) {
-                System.out.println(pomContent);
-                throw new RuntimeException("Unable to resolve version for dependency: " + dep);
+            if(resolvedVersion == null){ // VERSION AS PROPERTY
+                // Check parent pom if contains property
+                NodeList parentNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "parent");
+                if (parentNodes.getLength() <= 0) {
+                    throw new NoParentException("Error resolving property from parent POM, no <parent> element! Content: \n"+pomContent);
+                }
+                Element parentElement = (Element) parentNodes.item(0);
+                String parentGroupId = getElementContent(parentElement, "groupId");
+                String parentArtifactId = getElementContent(parentElement, "artifactId");
+                String parentVersion = getElementContent(parentElement, "version");
+                try {
+                    // Hope that the parent contains the version property
+                    if(parentGroupId.equals("org.apache.maven") && parentArtifactId.equals("maven-parent"))
+                        throw new NoParentException("Reached maven-parent, thus went through all parents without finding the version!");
+                    Dependency parentDep = new Dependency(parentGroupId, parentArtifactId, parentVersion);
+                    String parentPomContent = downloadPom(parentDep, currentRepositories);
+                    if(parentPomContent.isEmpty()) throw new NullPointerException(parentPomContent);
+                    Document parentPomDoc = parsePom(parentDep, parentPomContent);
+                    if(parentArtifactId.equals("surefire") && dep.artifactId.equals("common-junit48"))
+                        System.out.println("WOWS");
+                    resolvedVersion = resolveVersionFromProperty(dep, dep.version, parentPomContent, parentPomDoc);
+                    if(resolvedVersion == null){
+                        // Go one up into parent and try again
+                        resolveVersion(dep, parentPomContent, parentPomDoc, resolvedDependencies, visitedDeps, currentRepositories);
+                        return;
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Error resolving dependency ("+dep+") property version from parent POM ("+parentGroupId+":"+parentArtifactId+":"+parentVersion+")", e);
+                }
             }
 
+            dep.version = resolvedVersion;
             VERSION_CACHE.put(cacheKey, resolvedVersion);
-            return resolvedVersion;
         }
 
-        protected String resolvePropertyVersion(String propertyRef, Document pomDoc) {
+        protected String resolveVersionFromProperty(Dependency dep, String propertyRef, String pomContent, Document pomDoc) {
             String propertyName = propertyRef.substring(2, propertyRef.length() - 1);
-            NodeList propertiesNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "properties");
+            String value = resolveVersionFromProperty1(dep, propertyName, pomContent, pomDoc);
+            if (value == null) {
+                System.err.println("Property not found: " + propertyName);
+                return null;
+            }
+            return value.contains("${") ? resolveVersionFromProperty(dep, value, pomContent, pomDoc) : value;
+        }
 
+        protected String resolveVersionFromProperty1(Dependency dep, String propertyName, String pomContent, Document pomDoc) {
+            String[] propertyParts = propertyName.split("\\.");
+
+            // Check project properties
+            NodeList propertiesNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "properties");
             for (int i = 0; i < propertiesNodes.getLength(); i++) {
                 Element propertiesElement = (Element) propertiesNodes.item(i);
                 NodeList propertyNodes = propertiesElement.getChildNodes();
-
                 for (int j = 0; j < propertyNodes.getLength(); j++) {
                     Node propertyNode = propertyNodes.item(j);
                     if (propertyNode.getNodeType() == Node.ELEMENT_NODE &&
@@ -841,57 +979,108 @@ public class JPM {
                 }
             }
 
-            // If property not found in properties, check project version
-            if ("project.version".equals(propertyName)) {
-                NodeList versionNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "version");
-                if (versionNodes.getLength() > 0) {
-                    return versionNodes.item(0).getTextContent().trim();
+            // Check nested project properties
+            if(propertyParts[0].equals("project")) propertyParts = Arrays.copyOfRange(propertyParts, 1, propertyParts.length);
+            Element projectElement = pomDoc.getDocumentElement();
+            Element currentElement = projectElement;
+            for (String part : propertyParts) {
+                NodeList childNodes = currentElement.getChildNodes();
+                currentElement = null;
+                for (int i = 0; i < childNodes.getLength(); i++) {
+                    Node childNode = childNodes.item(i);
+                    if (childNode.getNodeType() == Node.ELEMENT_NODE &&
+                            childNode.getLocalName().equals(part)) {
+                        currentElement = (Element) childNode;
+                        break;
+                    }
+                }
+                if (currentElement == null) {
+                    break;
                 }
             }
+            if (currentElement != null && !currentElement.equals(projectElement)) {
+                return currentElement.getTextContent().trim();
+            }
 
-            throw new RuntimeException("Property not found: " + propertyName);
+            return null;
         }
 
+        private static class NoParentException extends RuntimeException{
+            public NoParentException(String message) {
+                super(message);
+            }
+
+            public NoParentException(String message, Throwable cause) {
+                super(message, cause);
+            }
+        }
+
+        /**
+         * Expects dep.version to be either null or a property. <br>
+         * Either way the parent pom will be fetched, then if dep.version null
+         * we search for the dep in that poms dependencies,
+         * if dep.version a property we check that poms properties. <br>
+         * Both cases might fail, thus do the same with parent of parent, etc. until no parent is left.
+         */
         protected List<String> getAvailableVersions(Document pomDoc) {
             List<String> availableVersions = new ArrayList<>();
             NodeList versionElements = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "version");
             for (int i = 0; i < versionElements.getLength(); i++) {
-                availableVersions.add(versionElements.item(i).getTextContent().trim());
+                Node item = versionElements.item(i);
+                availableVersions.add(item.getTextContent().trim());
             }
             return availableVersions;
         }
 
-        protected List<Dependency> parseTransitiveDependencies(String pomContent, Document pomDoc) {
+        public enum DependencyType {
+            REGULAR("dependencies"), MANAGED("dependencyManagement");
+            public final String enclosingXMLTagName;
+
+            DependencyType(String enclosingXMLTagName) {
+                this.enclosingXMLTagName = enclosingXMLTagName;
+            }
+        }
+
+        /**
+         * Unsafe because their versions are not retrieved. <br>
+         * Merges regular dependencies into managed dependencies (if the regular dependency doesn't exist yet). <br>
+         * But as you can see managed dependencies are always added first.
+         */
+        protected List<Dependency> getDependenciesUnsafe(Document pomDoc){
+            List<Dependency> managed = getDependenciesUnsafe(pomDoc, DependencyType.MANAGED);
+            List<Dependency> regular =  getDependenciesUnsafe(pomDoc, DependencyType.REGULAR);
+            List<Dependency> merged = new ArrayList<>();
+            merged.addAll(managed);
+            for (Dependency dep : regular) {
+                boolean containsManagedDep = false;
+                for (Dependency managedDep : managed) {
+                    if(managedDep.groupId.equals(dep.groupId) && managedDep.artifactId.equals(dep.artifactId)){
+                        containsManagedDep = true;
+                        break;
+                    }
+                }
+                if(!containsManagedDep) merged.add(dep);
+            }
+            return merged;
+        }
+        /**
+         * Unsafe because their versions are not retrieved.
+         */
+        protected List<Dependency> getDependenciesUnsafe(Document pomDoc, DependencyType dependencyType){
             List<Dependency> deps = new ArrayList<>();
-            NodeList dependencyNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "dependency");
-
-            // Parse dependencyManagement section first
-            Map<String, String> managedVersions = parseDependencyManagement(pomDoc);
-
-            for (int i = 0; i < dependencyNodes.getLength(); i++) {
-                Element depElement = (Element) dependencyNodes.item(i);
-                String groupId = getElementContent(depElement, "groupId");
-                String artifactId = getElementContent(depElement, "artifactId");
-                String version = getElementContent(depElement, "version");
-                String scope = getElementContent(depElement, "scope");
-                boolean optional = Boolean.parseBoolean(getElementContent(depElement, "optional"));
-
-                if (!optional) {
-                    // If version is null, check in managedVersions
-                    if (version == null) {
-                        String key = groupId + ":" + artifactId;
-                        version = managedVersions.get(key);
-                    }
-
-                    if (version != null) {
-                        if (version.startsWith("${")) {
-                            version = resolvePropertyVersion(version, pomDoc);
-                        }
-                        deps.add(new Dependency(groupId, artifactId, version, scope));
-                    } else {
-                        System.out.println(pomContent);
-                        System.out.println("Warning: No version found for dependency " + groupId + ":" + artifactId);
-                    }
+            NodeList enclosingNodes = pomDoc.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", dependencyType.enclosingXMLTagName);
+            if (enclosingNodes.getLength() > 0) {
+                Element el = (Element) enclosingNodes.item(0);
+                NodeList nodes = el.getElementsByTagNameNS("http://maven.apache.org/POM/4.0.0", "dependency");
+                for (int i = 0; i < nodes.getLength(); i++) {
+                    Element depElement = (Element) nodes.item(i);
+                    String groupId = getElementContent(depElement, "groupId");
+                    String artifactId = getElementContent(depElement, "artifactId");
+                    String version = getElementContent(depElement, "version");
+                    String scope = getElementContent(depElement, "scope");
+                    boolean optional = Boolean.parseBoolean(getElementContent(depElement, "optional"));
+                    Dependency transitiveDependency = new Dependency(groupId, artifactId, version, scope);
+                    deps.add(transitiveDependency);
                 }
             }
             return deps;
@@ -1017,16 +1206,15 @@ public class JPM {
         }
 
         protected void handleDependencyConflicts(Set<Dependency> dependencies) {
-            Map<String, Dependency> latestVersions = new HashMap<>();
+            Map<String, SortedSet<Dependency>> dependencyVersions = new HashMap<>();
             for (Dependency dep : dependencies) {
                 String key = dep.groupId + ":" + dep.artifactId;
-                Dependency existing = latestVersions.get(key);
-                if (existing == null || compareVersions(dep.version, existing.version) > 0) {
-                    latestVersions.put(key, dep);
-                }
+                dependencyVersions.computeIfAbsent(key, k -> new TreeSet<>((d1, d2) -> compareVersions(d2.version, d1.version))).add(dep);
             }
             dependencies.clear();
-            dependencies.addAll(latestVersions.values());
+            for (SortedSet<Dependency> versions : dependencyVersions.values()) {
+                dependencies.add(versions.first()); // Add the highest version
+            }
         }
 
         protected void generateBuildSignature(Set<Dependency> dependencies, Project project) throws Exception {
@@ -1046,11 +1234,26 @@ public class JPM {
         }
 
         protected String resolveVersionRange(String versionRange, List<String> availableVersions) {
-            VersionRange range = new VersionRange(versionRange);
+            if (!versionRange.contains(",")) {
+                return versionRange; // It's a specific version, not a range
+            }
+
+            List<VersionRange> ranges = parseVersionRanges(versionRange);
             return availableVersions.stream()
-                    .filter(range::includes)
+                    .filter(v -> ranges.stream().allMatch(r -> r.includes(v)))
                     .max(JPM::compareVersions)
                     .orElseThrow(() -> new RuntimeException("No version satisfies range: " + versionRange));
+        }
+
+        protected List<VersionRange> parseVersionRanges(String versionRange) {
+            List<VersionRange> ranges = new ArrayList<>();
+            String[] parts = versionRange.split(",");
+            for (int i = 0; i < parts.length; i += 2) {
+                String lower = parts[i].trim();
+                String upper = (i + 1 < parts.length) ? parts[i + 1].trim() : "";
+                ranges.add(new VersionRange(lower + "," + upper));
+            }
+            return ranges;
         }
 
         protected void handleMultiProjectBuild(Project rootProject) throws Exception {
@@ -1097,11 +1300,23 @@ public class JPM {
             Path localPath = getLocalArtifactPath(dep, "jar");
             Files.createDirectories(localPath.getParent());
             Files.copy(artifactPath, localPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Verify checksum
+            verifyChecksum(dep, "jar");
         }
 
         protected boolean isArtifactCached(Dependency dep) {
             Path localPath = getLocalArtifactPath(dep, "jar");
-            return Files.exists(localPath);
+            if (!Files.exists(localPath)) {
+                return false;
+            }
+            try {
+                verifyChecksum(dep, "jar");
+                return true;
+            } catch (IOException e) {
+                System.out.println("Warning: Cached artifact for " + dep + " failed checksum verification. Will re-download.");
+                return false;
+            }
         }
 
         protected void updateCentralIndex() throws Exception {

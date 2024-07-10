@@ -55,9 +55,17 @@ public class JPM {
 }
 ```
 
+## Why a single file?
+- IDEs should provide decent auto-complete when JPM.java is in the project root (where your pom.xml/build.gradle)
+usually is.
+- To access all your IDEs fancy features, you can also add JPM.java to ./src/main/java.
+This also grants the rest of your project easy access to its data, like your projects version for example.
+Just make sure that your working dir is still at ./ when executing tasks.
+- Simple drag and drop installation.
 
 ## Progress
-1JPM is a comparatively new project, thus does not contain all the functionalities of the other
+1JPM is a new project and currently an early-access/beta release,
+thus does not contain all the functionalities of the other
 major build tools like Maven and Gradle, however should provide the basic and most used functions.
 
 Below you can see some Gradle tasks that are available in 1JPM (or planned).
