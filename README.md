@@ -19,16 +19,18 @@ and third-party plugins can be added simply by appending their Java code at the 
 
 ```java
 class ThisProject extends JPM.Project {
-  static{
-    JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
-      //deployToServer(project); // If it throws an exception the whole build stops
+  static{ // Task related examples (optional):
+    JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> {
+      // Register custom task named "deploy", and run your tasks code here.
+      // If this throws an exception the whole build stops.
     }));
     JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
-      // Run something after/before another task, in this case after the "build" task
+      // Run something after/before another task.
+      // In this case after the "build" task.
     }));
   }
 
-  public ThisProject(List<String> argList) {
+  public ThisProject(List<String> args) {
     // Override default configurations
     this.groupId = "com.mycompany";
     this.artifactId = "my-project";
@@ -46,10 +48,20 @@ class ThisProject extends JPM.Project {
     addCompilerArg("-Xlint:unchecked");
     addCompilerArg("-Xlint:deprecation");
   }
+
+  public static void main(String[] args) throws Exception {
+    JPM.main(args);
+  }
+}
+
+class ThirdPartyPlugins extends JPM.Plugins{
+  // Add third party plugins below:
+  // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
 
-// 1JPM version 1.0.2 by Osiris-Team
+// 1JPM version 1.0.3 by Osiris-Team
+// To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
   //...
 }

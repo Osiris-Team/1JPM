@@ -16,12 +16,14 @@ import javax.xml.parsers.*;
 import org.w3c.dom.*;
 
 class ThisProject extends JPM.Project {
-    static{
-        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> { // Register custom task
-            //deployToServer(project); // If it throws an exception the whole build stops
+    static{ // Optional task related examples:
+        JPM.ROOT.pluginsAfter.add(new JPM.Plugin("deploy").withExecute((project) -> {
+            // Register custom task named "deploy", and run your tasks code here.
+            // If this throws an exception the whole build stops.
         }));
         JPM.Build.GET.pluginsAfter.add(new JPM.Plugin("").withExecute((project) -> {
-            // Run something after/before another task, in this case after the "build" task
+            // Run something after/before another task.
+            // In this case after the "build" task
         }));
     }
 
