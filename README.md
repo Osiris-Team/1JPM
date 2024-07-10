@@ -9,7 +9,7 @@ Meaning instead of writing XML (Maven) or Groovy (Gradle), your build file is Ja
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM jar`
 - Earlier Java versions are not supported
 
-to build your project (`jar` is a task, which compiles and creates a jar file from your code).
+`jar` is a task, which compiles and creates a jar file from your code.
 If you want to include dependencies in the jar run `fatJar` instead.
 
 1JPM works in a very similar way to Gradle, however
