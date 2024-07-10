@@ -57,7 +57,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
 }
 
 
-// 1JPM version 1.0.3 by Osiris-Team
+// 1JPM version 1.0.4 by Osiris-Team
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final Plugin ROOT = new Plugin("root");
@@ -689,6 +689,10 @@ public class JPM {
 
         protected final Object lock = new Object();
 
+        /**
+         * Resolves dependencies recursively, handling version conflicts and downloading artifacts.
+         * @throws Exception if resolution fails or timeout occurs
+         */
         protected void resolveDependencies(Project project) throws Exception {
             System.out.println("Resolving dependencies...");
             Path libDir = Paths.get(project.libDir);
@@ -726,6 +730,10 @@ public class JPM {
             generateBuildSignature(resolvedDependencies, project);
         }
 
+        /**
+         * Recursively resolves a dependency and its transitive dependencies.
+         * Handles circular dependencies and caching.
+         */
         protected void resolveDependencyTree(List<CompletableFuture<Void>> futures, Dependency dep,
                                              Set<Dependency> resolvedDependencies, Set<String> visitedDeps, Set<String> currentRepositories) {
             futures.add(CompletableFuture.runAsync(() -> {
@@ -782,6 +790,11 @@ public class JPM {
             }));
         }
 
+        /**
+         * Downloads POM file from repositories or retrieves from local cache.
+         * @return POM content as string, or empty string if scope is "provided" and POM not found
+         * @throws IOException if POM cannot be retrieved
+         */
         protected String downloadPom(Dependency dep, Set<String> repositories) throws IOException {
             Path localPomPath = getLocalArtifactPath(dep, "pom");
             if (Files.exists(localPomPath)) {
@@ -975,6 +988,10 @@ public class JPM {
             VERSION_CACHE.put(cacheKey, resolvedVersion);
         }
 
+        /**
+         * Resolves version from property references, handling nested properties and parent POMs.
+         * @return resolved version or null if property not found
+         */
         protected String resolveVersionFromProperty(Dependency dep, String propertyRef, String pomContent, Document pomDoc) {
             String propertyName = propertyRef.substring(2, propertyRef.length() - 1);
             String value = resolveVersionFromProperty1(dep, propertyName, pomContent, pomDoc);
@@ -1065,9 +1082,8 @@ public class JPM {
         }
 
         /**
-         * Unsafe because their versions are not retrieved. <br>
-         * Merges regular dependencies into managed dependencies (if the regular dependency doesn't exist yet). <br>
-         * But as you can see managed dependencies are always added first.
+         * Retrieves dependencies from POM, merging managed and regular dependencies.
+         * @return List of dependencies with potentially unresolved versions
          */
         protected List<Dependency> getDependenciesUnsafe(Document pomDoc){
             List<Dependency> managed = getDependenciesUnsafe(pomDoc, DependencyType.MANAGED);
@@ -1256,6 +1272,10 @@ public class JPM {
             System.out.println("Build signature generated: " + signature);
         }
 
+        /**
+         * Resolves version ranges against available versions.
+         * @return Highest matching version or throws RuntimeException if no match found
+         */
         protected String resolveVersionRange(String versionRange, List<String> availableVersions) {
             if (!versionRange.contains(",")) {
                 return versionRange; // It's a specific version, not a range
@@ -1279,6 +1299,10 @@ public class JPM {
             return ranges;
         }
 
+        /**
+         * Handles multi-project builds by resolving dependencies for all subprojects.
+         * Replaces inter-project dependencies with project outputs.
+         */
         protected void handleMultiProjectBuild(Project rootProject) throws Exception {
             List<Project> allProjects = new ArrayList<>();
             allProjects.add(rootProject);
@@ -1356,6 +1380,10 @@ public class JPM {
                     .forEach(File::delete);
         }
 
+        /**
+         * Generates a report of all dependencies and their transitive dependencies.
+         * @param reportPath Path where the report will be written
+         */
         protected void generateDependencyReport(Set<Dependency> dependencies, Path reportPath) throws IOException {
             List<String> reportLines = new ArrayList<>();
             reportLines.add("Dependency Report");

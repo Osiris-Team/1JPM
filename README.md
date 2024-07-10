@@ -76,6 +76,8 @@ usually is.
 This also grants the rest of your project easy access to its data, like your projects version for example.
 Just make sure that your working dir is still at ./ when executing tasks.
 - Simple drag and drop installation.
+- Direct access to the source of 1JPM and what happens under the hood for those who like exploring or better
+understanding how something works, which can be helpful if issues arise.
 
 #### Cons / Todo
 - Developing plugins is tricky since you can't really use third-party dependencies at the moment.
@@ -87,7 +89,10 @@ including any dependencies used.
 thus does not contain all the functionalities of the other
 major build tools like Maven and Gradle, however should provide the basic and most used functions.
 
-Below you can see some Gradle tasks that are available in 1JPM (or planned).
+### IntelliJ IDEA and VSCode plugins (Future release)
+- Allow seamless integration into major IDEs.
+
+### Below you can see some Gradle tasks that are available in 1JPM (or planned).
 
 ### `build` ✅
 
