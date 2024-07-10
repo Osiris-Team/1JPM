@@ -3,7 +3,7 @@
 It's a single Java file itself, which should be edited by you to configure your project.
 
 Meaning instead of writing XML (Maven) or Groovy (Gradle), your build file is Java code too.
-**To be more exact, you [download/copy the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) into your project, open a terminal and execute:**
+**Thus to build your project, [download/copy the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) into your project, open a terminal and execute:**
 
 - Java 11 and above: `java JPM.java jar`
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM jar`
