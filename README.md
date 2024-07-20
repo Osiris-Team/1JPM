@@ -14,7 +14,8 @@ If you want to include dependencies in the jar run `fatJar` instead.
 
 1JPM works in a very similar way to Gradle, however
 everything in 1JPM is a plugin (even all its tasks), 
-and third-party plugins can be added simply by appending their Java code inside ThirdPartyPlugins
+and third-party plugins can be added simply by appending their Java code inside ThirdPartyPlugins.
+You can find a list here at [#1jpm-plugin](https://github.com/topics/1jpm-plugin?o=desc&s=updated).
 (these must be written in Java 8 and not use external dependencies).
 
 ```java
