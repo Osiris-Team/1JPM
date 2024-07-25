@@ -46,7 +46,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
     // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
-// 1JPM version 2.0.1 by Osiris-Team
+// 1JPM version 2.0.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
