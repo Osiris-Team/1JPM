@@ -78,3 +78,9 @@ understanding how something works, which can be helpful if issues arise.
 #### Cons / Todo
 - Developing plugins is tricky (if you want them to be more complex) since you can't really use third-party dependencies at the moment.
 A workaround for this would be developing a task like "minifyProject" which would merge a complete project into 1 line of code,
+
+## Tipps
+- You can use ChatGTP (or another LLM) to easily port your current Maven/Gradle based project over to 1JPM,
+by sending it the above example `ThisProject` class and your current build config files (pom.xml/build.gradle),
+then prompting it something like: "Port my current Maven/Gradle project to the JPM build tool, by modifing the ThisProject class accordingly".
+If you have additional plugins also send it an example plugin from within the JPM class.
