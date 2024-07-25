@@ -11,7 +11,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 
 class ThisProject extends JPM.Project {
 
@@ -46,7 +47,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
     // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
-// 1JPM version 2.0.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+// 1JPM version 2.1.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -93,6 +94,7 @@ public class JPM {
 
         System.out.println("Downloading file from: " + wrapperUrl);
         URL url = new URL(wrapperUrl);
+        script.getParentFile().mkdirs();
         Files.copy(url.openStream(), script.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
@@ -101,6 +103,7 @@ public class JPM {
 
         System.out.println("Downloading file from: " + wrapperUrl);
         URL url = new URL(wrapperUrl);
+        jar.getParentFile().mkdirs();
         Files.copy(url.openStream(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
@@ -334,7 +337,7 @@ public class JPM {
     }
 
     public static class Plugin {
-        public Consumer<Project> beforeGetConfiguration = (project) -> {};
+        public List<BiConsumer<Project, XML>> beforeToXMLListeners = new CopyOnWriteArrayList<>();
         protected String groupId;
         protected String artifactId;
         protected String version;
@@ -352,11 +355,6 @@ public class JPM {
             this.version = version;
         }
 
-        public Plugin withBeforeGetConfiguration(Consumer<Project> code){
-            this.beforeGetConfiguration = code;
-            return this;
-        }
-
         public void addConfiguration(String key, String value) {
             configuration.put(key, value);
         }
@@ -369,19 +367,26 @@ public class JPM {
             dependencies.add(dependency);
         }
 
-        private void executeBeforeGetConfiguration(Project project) {
-            beforeGetConfiguration.accept(project);
+        public Plugin onBeforeToXML(BiConsumer<Project, XML> code){
+            beforeToXMLListeners.add(code);
+            return this;
         }
 
-        private void executeAfterGetConfiguration(Project project) {
+        private void executeBeforeToXML(Project project, XML projectXML) {
+            for (BiConsumer<Project, XML> code : beforeToXMLListeners) {
+                code.accept(project, projectXML);
+            }
+        }
+
+        private void executeAfterToXML(Project project) {
             configuration.clear();
             executions.clear();
             dependencies.clear();
         }
 
 
-        public XML getConfiguration(Project project) {
-            executeBeforeGetConfiguration(project);
+        public XML toXML(Project project, XML projectXML) {
+            executeBeforeToXML(project, projectXML);
 
             // Create an XML object for the <plugin> element
             XML xml = new XML("plugin");
@@ -410,7 +415,7 @@ public class JPM {
                 }
             }
 
-            executeAfterGetConfiguration(project);
+            executeAfterToXML(project);
             return xml;
         }
     }
@@ -552,7 +557,7 @@ public class JPM {
             // Add <dependencyManagement> if there are managed dependencies
             if (!dependenciesManaged.isEmpty()) {
                 for (Dependency dep : dependenciesManaged) {
-                    pom.add("dependencyManagement", dep.toXML());
+                    pom.add("dependencyManagement dependencies", dep.toXML());
                 }
             }
 
@@ -565,10 +570,10 @@ public class JPM {
 
             // Add <build> section with plugins and resources
             for (Plugin plugin : JPM.plugins) {
-                pom.add("build plugins", plugin.getConfiguration(this));
+                pom.add("build plugins", plugin.toXML(this, pom));
             }
             for (Plugin plugin : plugins) {
-                pom.add("build plugins", plugin.getConfiguration(this));
+                pom.add("build plugins", plugin.toXML(this, pom));
             }
 
             // Add resources with a comment
@@ -592,7 +597,7 @@ public class JPM {
         public static CompilerPlugin get = new CompilerPlugin();
         public CompilerPlugin() {
             super("org.apache.maven.plugins", "maven-compiler-plugin", "3.8.1");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 addConfiguration("source", project.javaVersionSource);
                 addConfiguration("target", project.javaVersionTarget);
 
@@ -613,7 +618,7 @@ public class JPM {
         public static JarPlugin get = new JarPlugin();
         public JarPlugin() {
             super("org.apache.maven.plugins", "maven-jar-plugin", "3.2.0");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 addConfiguration("archive manifest addClasspath", "true");
                 addConfiguration("archive manifest mainClass", project.mainClass);
                 addConfiguration("finalName", project.jarName.replace(".jar", ""));
@@ -628,7 +633,7 @@ public class JPM {
         public static AssemblyPlugin get = new AssemblyPlugin();
         public AssemblyPlugin() {
             super("org.apache.maven.plugins", "maven-assembly-plugin", "3.3.0");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 addConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
                 addConfiguration("archive manifest mainClass", project.mainClass);
                 addConfiguration("finalName", project.fatJarName.replace(".jar", ""));
@@ -648,7 +653,7 @@ public class JPM {
         public static SourcePlugin get = new SourcePlugin();
         public SourcePlugin() {
             super("org.apache.maven.plugins", "maven-source-plugin", "3.2.1");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 Execution execution = new Execution("attach-sources", null);
                 addExecution(execution);
                 execution.addGoal("jar");
@@ -663,7 +668,7 @@ public class JPM {
         public static JavadocPlugin get = new JavadocPlugin();
         public JavadocPlugin() {
             super("org.apache.maven.plugins", "maven-javadoc-plugin", "3.0.0");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 Execution execution = new Execution("resource-bundles", "package");
                 addExecution(execution);
                 execution.addGoal("resource-bundle");
@@ -681,7 +686,7 @@ public class JPM {
         public static EnforcerPlugin get = new EnforcerPlugin();
         public EnforcerPlugin() {
             super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.3.0");
-            withBeforeGetConfiguration(project -> {
+            onBeforeToXML((project, pom) -> {
                 Execution execution = new Execution("enforce", null);
                 addExecution(execution);
                 execution.addGoal("enforce");
