@@ -24,38 +24,38 @@ You can find a list here at [#1jpm-plugin](https://github.com/topics/1jpm-plugin
 ```java
 class ThisProject extends JPM.Project {
 
-  public ThisProject(List<String> args) {
-    // Override default configurations
-    this.groupId = "com.mycompany";
-    this.artifactId = "my-project";
-    this.version = "1.0.0";
-    this.mainClass = "com.mycompany.MyMainClass";
-    this.jarName = "my-project.jar";
-    this.fatJarName = "my-project-with-dependencies.jar";
+    public ThisProject(List<String> args) {
+        // Override default configurations
+        this.groupId = "com.mycompany";
+        this.artifactId = "my-project";
+        this.version = "1.0.0";
+        this.mainClass = "com.mycompany.MyMainClass";
+        this.jarName = "my-project.jar";
+        this.fatJarName = "my-project-with-dependencies.jar";
 
-    // Add some example dependencies
-    implementation("junit:junit:4.13.2");
-    implementation("org.apache.commons:commons-lang3:3.12.0");
-    // If there are duplicate dependencies with different versions force a specific version like so:
-    //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
+        // Add some example dependencies
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+        implementation("org.apache.commons:commons-lang3:3.12.0");
+        // If there are duplicate dependencies with different versions force a specific version like so:
+        //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
 
-    // Add some compiler arguments
-    addCompilerArg("-Xlint:unchecked");
-    addCompilerArg("-Xlint:deprecation");
-  }
+        // Add some compiler arguments
+        addCompilerArg("-Xlint:unchecked");
+        addCompilerArg("-Xlint:deprecation");
+    }
 
-  public static void main(String[] args) throws Exception {
-    new ThisProject(Arrays.asList(args)).generatePom();
-    JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
-  }
+    public static void main(String[] args) throws Exception {
+        new ThisProject(Arrays.asList(args)).generatePom();
+        JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+    }
 }
 
 class ThirdPartyPlugins extends JPM.Plugins{
-  // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
-  // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
+    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+    // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
-// 1JPM version 2.0.0 by Osiris-Team
+// 1JPM version 2.0.1 by Osiris-Team
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
   //...

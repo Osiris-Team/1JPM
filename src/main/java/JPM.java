@@ -25,7 +25,7 @@ class ThisProject extends JPM.Project {
         this.fatJarName = "my-project-with-dependencies.jar";
 
         // Add some example dependencies
-        implementation("junit:junit:4.13.2");
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
         implementation("org.apache.commons:commons-lang3:3.12.0");
         // If there are duplicate dependencies with different versions force a specific version like so:
         //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
@@ -46,7 +46,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
     // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
-// 1JPM version 2.0.0 by Osiris-Team
+// 1JPM version 2.0.1 by Osiris-Team
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -156,6 +156,17 @@ public class JPM {
             return groupId + ":" + artifactId + ":" + version + ":" + scope;
         }
 
+        public XML toXML(){
+            XML xml = new XML("dependency");
+            xml.put("groupId", groupId);
+            xml.put("artifactId", artifactId);
+            xml.put("version", version);
+            if (scope != null) {
+                xml.put("scope", scope);
+            }
+            return xml;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -206,37 +217,40 @@ public class JPM {
         }
 
         // Method to append another XML object to this XML document's root.
-        public void append(XML otherXML) {
+        public XML add(XML otherXML) {
             Node importedNode = document.importNode(otherXML.root, true);
             root.appendChild(importedNode);
+            return this;
         }
 
         // Method to append another XML object to a specific element in this XML document.
-        public void put(String key, XML otherXML) {
+        public XML add(String key, XML otherXML) {
             Element parentElement = getOrCreateElement(key);
             Node importedNode = document.importNode(otherXML.root, true);
             parentElement.appendChild(importedNode);
+            return this;
         }
 
         // Method to add a value to the XML document at the specified path.
-        public Element put(String key, String value) {
+        public XML put(String key, String value) {
             Element currentElement = getOrCreateElement(key);
             if(value != null && !value.isEmpty())
                 currentElement.setTextContent(value);
-            return currentElement;
+            return this;
         }
 
         // Method to add a comment to the XML document at the specified path.
-        public void putComment(String key, String comment) {
+        public XML putComment(String key, String comment) {
             Element currentElement = getOrCreateElement(key);
             Node parentNode = currentElement.getParentNode();
             Node commentNode = document.createComment(comment);
 
             // Insert the comment before the specified element.
             parentNode.insertBefore(commentNode, currentElement);
+            return this;
         }
 
-        public void putAttributes(String key, String... attributes) {
+        public XML putAttributes(String key, String... attributes) {
             if (attributes.length % 2 != 0) {
                 throw new IllegalArgumentException("Attributes must be in key-value pairs.");
             }
@@ -249,16 +263,18 @@ public class JPM {
                 String attrValue = attributes[i + 1];
                 currentElement.setAttribute(attrName, attrValue);
             }
+            return this;
         }
 
         // Method to add attributes to an element in the XML document at the specified path.
-        public void putAttributes(String key, Map<String, String> attributes) {
+        public XML putAttributes(String key, Map<String, String> attributes) {
             Element currentElement = getOrCreateElement(key);
 
             // Set each attribute in the map on the element.
             for (Map.Entry<String, String> entry : attributes.entrySet()) {
                 currentElement.setAttribute(entry.getKey(), entry.getValue());
             }
+            return this;
         }
 
         // Helper method to traverse or create elements based on a path.
@@ -383,19 +399,14 @@ public class JPM {
             // Add <executions> if not empty
             if (!executions.isEmpty()) {
                 for (Execution execution : executions) {
-                    xml.put("executions", execution.getConfiguration());
+                    xml.add("executions", execution.toXML());
                 }
             }
 
             // Add <dependencies> if not empty
             if (!dependencies.isEmpty()) {
                 for (Dependency dependency : dependencies) {
-                    xml.put("dependencies dependency groupId", dependency.groupId);
-                    xml.put("dependencies dependency artifactId", dependency.artifactId);
-                    xml.put("dependencies dependency version", dependency.version);
-                    if (dependency.scope != null) {
-                        xml.put("dependencies dependency scope", dependency.scope);
-                    }
+                    xml.add("dependencies", dependency.toXML());
                 }
             }
 
@@ -425,7 +436,7 @@ public class JPM {
             configuration.put(key, value);
         }
 
-        public XML getConfiguration() {
+        public XML toXML() {
             // Create an instance of XML with the root element <execution>
             XML xml = new XML("execution");
 
@@ -477,14 +488,22 @@ public class JPM {
             repositories.add(Repository.fromUrl(url));
         }
 
+        public void testImplementation(String s){
+            String[] split = s.split(":");
+            if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
+            addDependency(split[0], split[1], split[2]).scope = "test";
+        }
+
         public void implementation(String s){
             String[] split = s.split(":");
             if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
             addDependency(split[0], split[1], split[2]);
         }
 
-        public void addDependency(String groupId, String artifactId, String version) {
-            dependencies.add(new Dependency(groupId, artifactId, version));
+        public Dependency addDependency(String groupId, String artifactId, String version) {
+            Dependency dep = new Dependency(groupId, artifactId, version);
+            dependencies.add(dep);
+            return dep;
         }
 
         public void forceImplementation(String s){
@@ -533,27 +552,23 @@ public class JPM {
             // Add <dependencyManagement> if there are managed dependencies
             if (!dependenciesManaged.isEmpty()) {
                 for (Dependency dep : dependenciesManaged) {
-                    pom.put("dependencyManagement dependency groupId", dep.groupId);
-                    pom.put("dependencyManagement dependency artifactId", dep.artifactId);
-                    pom.put("dependencyManagement dependency version", dep.version);
+                    pom.add("dependencyManagement", dep.toXML());
                 }
             }
 
             // Add <dependencies> if there are dependencies
             if (!dependencies.isEmpty()) {
                 for (Dependency dep : dependencies) {
-                    pom.put("dependencies dependency groupId", dep.groupId);
-                    pom.put("dependencies dependency artifactId", dep.artifactId);
-                    pom.put("dependencies dependency version", dep.version);
+                    pom.add("dependencies", dep.toXML());
                 }
             }
 
             // Add <build> section with plugins and resources
             for (Plugin plugin : JPM.plugins) {
-                pom.put("build plugins", plugin.getConfiguration(this));
+                pom.add("build plugins", plugin.getConfiguration(this));
             }
             for (Plugin plugin : plugins) {
-                pom.put("build plugins", plugin.getConfiguration(this));
+                pom.add("build plugins", plugin.getConfiguration(this));
             }
 
             // Add resources with a comment
