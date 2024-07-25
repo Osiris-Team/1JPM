@@ -10,14 +10,15 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 - Earlier Java versions are not supported
 
 You can also clone/download this repository since it also functions as a template.
-Note that 1JPM is now a Maven pom.xml generator, since the complexity as a fully independent build tool
-(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file.
+Note that 1JPM is now using Maven under the hood, since the complexity as a fully independent build tool
+(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. It will download and use the Maven-Wrapper.
 
 Below you can see the example configuration which runs the `clean package` tasks.
 This compiles and creates a jar file from your code, and additionally creates the sources,
 javadoc and with-dependencies jars.
 
-Third-party plugins can be added simply by appending their Java code inside ThirdPartyPlugins.
+A 1JPM plugin is basically a wrapper around a Maven plugin (its xml), providing easy access to its features.
+These third-party plugins can be added simply by appending their Java code inside ThirdPartyPlugins.
 You can find a list here at [#1jpm-plugin](https://github.com/topics/1jpm-plugin?o=desc&s=updated).
 (these must be written in Java 8 and not use external dependencies).
 

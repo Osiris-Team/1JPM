@@ -47,7 +47,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
     // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
 }
 
-// 1JPM version 2.1.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+// 1JPM version 2.1.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -197,8 +197,15 @@ public class JPM {
         }
 
         public static Repository fromUrl(String url){
-            String id = url.split("//")[0].split("/")[0].replace(".", "").replace("-", "");
+            String id = url.split("//")[1].split("/")[0].replace(".", "").replace("-", "");
             return new Repository(id, url);
+        }
+
+        public XML toXML(){
+            XML xml = new XML("repository");
+            xml.put("id", id);
+            xml.put("url", url);
+            return xml;
         }
     }
 
@@ -282,19 +289,26 @@ public class JPM {
 
         // Helper method to traverse or create elements based on a path.
         private Element getOrCreateElement(String key) {
-            if(key == null || key.trim().isEmpty()) return root;
+            if (key == null || key.trim().isEmpty()) return root;
             String[] path = key.split(" ");
             Element currentElement = root;
 
             for (String nodeName : path) {
-                NodeList children = currentElement.getElementsByTagName(nodeName);
-                if (children.getLength() > 0) {
-                    currentElement = (Element) children.item(0);
-                } else {
-                    Element newElement = document.createElement(nodeName);
-                    currentElement.appendChild(newElement);
-                    currentElement = newElement;
+                Element childElement = null;
+                NodeList children = currentElement.getChildNodes();
+                for (int i = 0; i < children.getLength(); i++) {
+                    Node child = children.item(i);
+                    if (child.getNodeType() == Node.ELEMENT_NODE && child.getNodeName().equals(nodeName)) {
+                        childElement = (Element) child;
+                        break;
+                    }
                 }
+
+                if (childElement == null) {
+                    childElement = document.createElement(nodeName);
+                    currentElement.appendChild(childElement);
+                }
+                currentElement = childElement;
             }
 
             return currentElement;
@@ -549,8 +563,7 @@ public class JPM {
             // Add <repositories> if not empty
             if (!repositories.isEmpty()) {
                 for (Repository rep : repositories) {
-                    pom.put("repositories repository id", rep.id);
-                    pom.put("repositories repository url", rep.url);
+                    pom.add("repositories", rep.toXML());
                 }
             }
 
