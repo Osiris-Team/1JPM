@@ -77,4 +77,3 @@ understanding how something works, which can be helpful if issues arise.
 #### Cons / Todo
 - Developing plugins is tricky (if you want them to be more complex) since you can't really use third-party dependencies at the moment.
 A workaround for this would be developing a task like "minifyProject" which would merge a complete project into 1 line of code,
-including any dependencies used.
