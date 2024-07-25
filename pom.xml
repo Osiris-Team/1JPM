@@ -1,93 +1,33 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java--><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <groupId>com.osiris.onejpm</groupId>
-    <artifactId>onejpm</artifactId>
-    <version>0.0.1</version>
-    <packaging>jar</packaging>
-
-    <name>1JPM</name>
-    <description>1JPM</description>
-
+    <groupId>com.mycompany</groupId>
+    <artifactId>my-project</artifactId>
+    <version>1.0.0</version>
     <properties>
-        <java.version>8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <main.class>JPM</main.class>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
-
     <dependencies>
-        <!-- ========================================================================================================== -->
-        <!-- REGULAR DEPENDENCIES -->
-        <!-- ========================================================================================================== -->
         <dependency>
-            <groupId>com.github.Osiris-Team</groupId>
-            <artifactId>jlib</artifactId>
-            <version>18.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>24.1.0</version>
-        </dependency>
-
-
-        <!-- ========================================================================================================== -->
-        <!-- TEST DEPENDENCIES -->
-        <!-- ========================================================================================================== -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.7.2</version>
-            <scope>test</scope>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.12.0</version>
         </dependency>
     </dependencies>
-
-    <dependencyManagement>
-        <dependencies>
-        <!-- ========================================================================================================== -->
-        <!-- TRANSITIVE DEPENDENCIES -->
-        <!-- ========================================================================================================== -->
-
-
-        </dependencies>
-    </dependencyManagement>
-
     <build>
-        <finalName>${project.name}</finalName> <!-- If you'd like to have version information on your output jar, remove this. -->
-        <defaultGoal>clean package</defaultGoal>
         <plugins>
-
-            <!-- Responsible for running all tests before building. -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M5</version>
-            </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <compilerArgs>
+                        <arg>-Xlint:deprecation</arg>
+                    </compilerArgs>
+                    <source>8</source>
+                    <target>8</target>
                 </configuration>
             </plugin>
-                 
-            <!--
-            Make this jar executable.
-            Remember to check the the jars entry point (main.class property above).
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -95,36 +35,39 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>${main.class}</mainClass>
+                            <mainClass>com.mycompany.MyMainClass</mainClass>
+                            <addClasspath>true</addClasspath>
                         </manifest>
                     </archive>
+                    <finalName>my-project</finalName>
                 </configuration>
             </plugin>
-            -->
-
-            <!--
-            Puts your dependencies into the output jar file.
-            Do NOT use this when developing an API/LIB, since that might
-            cause issues with transitive dependencies in the projects that use your API/LIB.
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.mycompany.MyMainClass</mainClass>
+                        </manifest>
+                    </archive>
+                    <finalName>my-project-with-dependencies</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
                 <executions>
                     <execution>
+                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal>single</goal>
                         </goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
-            -->
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
@@ -138,7 +81,6 @@
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -148,28 +90,15 @@
                         <id>resource-bundles</id>
                         <phase>package</phase>
                         <goals>
-                            <!-- produce source artifact for main project sources -->
-                            <goal>resource-bundle</goal>
-
-                            <!-- produce source artifact for project test sources -->
                             <goal>test-resource-bundle</goal>
                         </goals>
                         <configuration>
-                            <doclint>none</doclint> <!-- Remove this, if you want to get build errors when there is an issue with a comment/documentation. -->
+                            <doclint>none</doclint>
                             <detectOfflineLinks>false</detectOfflineLinks>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-
-            <!--
-            Fails when the same dependency exists more than once, with different versions or if it's a SNAPSHOT.
-            If that is the case specify/add that dependency in <dependenciesManagement> (transitive dependency) above,
-            with a version that is compatible with all other dependencies, or
-            try to find an alternative dependency with similar functionality.
-            Note that having this check is crucial to avoid runtime "method not found" errors that will lead to crashes
-            and/or unexpected behaviour.
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -177,21 +106,19 @@
                 <executions>
                     <execution>
                         <id>enforce</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
                         <configuration>
                             <rules>
                                 <dependencyConvergence/>
                             </rules>
                         </configuration>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
                     </execution>
                 </executions>
             </plugin>
-
         </plugins>
-
-        <!-- Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering. -->
+        <!--Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering.-->
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -199,5 +126,4 @@
             </resource>
         </resources>
     </build>
-
 </project>
