@@ -523,7 +523,7 @@ public class JPM {
         public void generatePom() throws IOException {
             // Create a new XML document with the root element <project>
             XML pom = new XML("project");
-            pom.putComment("", "AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java");
+            pom.putComment("", "\n\n\n\nAUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java\n\n\n\n");
             pom.putAttributes("",
                     "xmlns", "http://maven.apache.org/POM/4.0.0",
                     "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",
