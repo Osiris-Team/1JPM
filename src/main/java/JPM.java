@@ -1,4 +1,3 @@
-import com.sun.org.apache.xerces.internal.dom.CommentImpl;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -26,9 +25,10 @@ class ThisProject extends JPM.Project {
         this.fatJarName = "my-project-with-dependencies.jar";
 
         // Add some example dependencies
-        addDependency("junit", "junit", "4.13.2");
-        addDependency("org.apache.commons", "commons-lang3", "3.12.0");
-        //implementation("org.apache.commons:commons-lang3:3.12.0"); // Same as above but similar to Gradle DSL
+        implementation("junit:junit:4.13.2");
+        implementation("org.apache.commons:commons-lang3:3.12.0");
+        // If there are duplicate dependencies with different versions force a specific version like so:
+        //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
 
         // Add some compiler arguments
         addCompilerArg("-Xlint:unchecked");
@@ -36,58 +36,93 @@ class ThisProject extends JPM.Project {
     }
 
     public static void main(String[] args) throws Exception {
-        ThisProject thisProject = new ThisProject(Arrays.asList(args));
-        thisProject.generatePom();
-        JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI like "java JPM.java clean package"
+        new ThisProject(Arrays.asList(args)).generatePom();
+        JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
     }
 }
 
+class ThirdPartyPlugins extends JPM.Plugins{
+    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+    // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
+}
 
-
-// 1JPM version 1.0.4 by Osiris-Team
+// 1JPM version 2.0.0 by Osiris-Team
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
-    // If you want to force a specific version of the wrapper replace "master" with "maven-wrapper-3.3.2" for example
-    private static final String MAVEN_WRAPPER_URL_BASE = "https://github.com/apache/maven-wrapper/blob/master/maven-wrapper-distribution/src/resources/";
+    public static final List<Plugin> plugins = new ArrayList<>();
+    private static final String mavenVersion = "3.9.8";
+    private static final String mavenWrapperVersion = "3.3.2";
+    private static final String mavenWrapperScriptUrlBase = "https://raw.githubusercontent.com/apache/maven-wrapper/maven-wrapper-"+ mavenWrapperVersion +"/maven-wrapper-distribution/src/resources/";
+    private static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
+    private static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
 
     public static void executeMaven(String... args) throws IOException, InterruptedException {
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
         ProcessBuilder p = new ProcessBuilder();
         List<String> finalArgs = new ArrayList<>();
-        File mavenWrapperFile = new File(System.getProperty("user.dir"),
-                "mvnw" + (isWindows ? ".cmd" : ""));
+        File userDir = new File(System.getProperty("user.dir"));
+        File mavenWrapperFile = new File(userDir, "mvnw" + (isWindows ? ".cmd" : ""));
+        File propertiesFile = new File(userDir, ".mvn/wrapper/maven-wrapper.properties");
+        File mavenWrapperJarFile = new File(userDir, ".mvn/wrapper/maven-wrapper.jar");
 
         if (!mavenWrapperFile.exists()) {
-            downloadMavenWrapper(isWindows);
+            downloadMavenWrapper(mavenWrapperFile);
+            if(!isWindows) mavenWrapperFile.setExecutable(true);
         }
+        if(!mavenWrapperJarFile.exists()) downloadMavenWrapperJar(mavenWrapperJarFile);
+        if (!propertiesFile.exists()) createMavenWrapperProperties(propertiesFile);
 
         finalArgs.add(mavenWrapperFile.getAbsolutePath());
         finalArgs.addAll(Arrays.asList(args));
         p.command(finalArgs);
         p.inheritIO();
+        System.out.print("Executing: ");
+        for (String arg : finalArgs) {
+            System.out.print(arg+" ");
+        }
+        System.out.println();
         Process result = p.start();
         result.waitFor();
         if(result.exitValue() != 0)
-            throw new RuntimeException("Maven finished with an error ("+result.exitValue()+").");
+            throw new RuntimeException("Maven ("+mavenWrapperFile.getName()+") finished with an error ("+result.exitValue()+"): "+mavenWrapperFile.getAbsolutePath());
     }
 
-    private static void downloadMavenWrapper(boolean isWindows) throws IOException {
-        String wrapperScript = isWindows ? "mvnw.cmd" : "mvnw";
-        String wrapperUrl = MAVEN_WRAPPER_URL_BASE + wrapperScript;
+    private static void downloadMavenWrapper(File script) throws IOException {
+        String wrapperUrl = mavenWrapperScriptUrlBase + script.getName();
 
-        System.out.println("Downloading Maven Wrapper: " + wrapperUrl);
+        System.out.println("Downloading file from: " + wrapperUrl);
         URL url = new URL(wrapperUrl);
-        Files.copy(url.openStream(), new File(wrapperScript).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(url.openStream(), script.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
 
-        if (!isWindows) {
-            new File(wrapperScript).setExecutable(true);
+    private static void downloadMavenWrapperJar(File jar) throws IOException {
+        String wrapperUrl = mavenWrapperJarUrl;
+
+        System.out.println("Downloading file from: " + wrapperUrl);
+        URL url = new URL(wrapperUrl);
+        Files.copy(url.openStream(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void createMavenWrapperProperties(File propertiesFile) throws IOException {
+        // Create the .mvn directory if it doesn't exist
+        File mvnDir = propertiesFile.getParentFile();
+        if (!mvnDir.exists()) {
+            mvnDir.mkdirs();
+        }
+
+        // Write default properties content to the file
+        try (FileWriter writer = new FileWriter(propertiesFile)) {
+            writer.write(mavenWrapperPropsContent);
         }
     }
 
     //
     // API and Models
     //
+
+    public static class Plugins {
+    }
 
     public static interface ConsumerWithException<T> extends Serializable {
         void accept(T t) throws Exception;
@@ -170,14 +205,25 @@ public class JPM {
             }
         }
 
-        public void append(XML otherXML){
-            root.appendChild(otherXML.root);
+        // Method to append another XML object to this XML document's root.
+        public void append(XML otherXML) {
+            Node importedNode = document.importNode(otherXML.root, true);
+            root.appendChild(importedNode);
+        }
+
+        // Method to append another XML object to a specific element in this XML document.
+        public void put(String key, XML otherXML) {
+            Element parentElement = getOrCreateElement(key);
+            Node importedNode = document.importNode(otherXML.root, true);
+            parentElement.appendChild(importedNode);
         }
 
         // Method to add a value to the XML document at the specified path.
-        public void put(String key, String value) {
+        public Element put(String key, String value) {
             Element currentElement = getOrCreateElement(key);
-            currentElement.setTextContent(value);
+            if(value != null && !value.isEmpty())
+                currentElement.setTextContent(value);
+            return currentElement;
         }
 
         // Method to add a comment to the XML document at the specified path.
@@ -217,7 +263,8 @@ public class JPM {
 
         // Helper method to traverse or create elements based on a path.
         private Element getOrCreateElement(String key) {
-            String[] path = key.split("/");
+            if(key == null || key.trim().isEmpty()) return root;
+            String[] path = key.split(" ");
             Element currentElement = root;
 
             for (String nodeName : path) {
@@ -259,13 +306,13 @@ public class JPM {
         public static void main(String[] args) {
             // Example usage of the XML class.
             XML xml = new XML("root");
-            xml.put("this/is/a/key", "value");
-            xml.put("this/is/another/key", "another value");
-            xml.putComment("this/is/another", "This is a comment for 'another'");
+            xml.put("this is a key", "value");
+            xml.put("this is another key", "another value");
+            xml.putComment("this is another", "This is a comment for 'another'");
             Map<String, String> atr = new HashMap<>();
             atr.put("attr1", "value1");
             atr.put("attr2", "value2");
-            xml.putAttributes("this/is/a/key", atr);
+            xml.putAttributes("this is a key", atr);
             System.out.println(xml.toString());
         }
     }
@@ -317,51 +364,43 @@ public class JPM {
         }
 
 
-        public String getConfiguration(Project project) {
+        public XML getConfiguration(Project project) {
             executeBeforeGetConfiguration(project);
 
-            StringBuilder config = new StringBuilder();
-            config.append("            <plugin>\n");
-            config.append("                <groupId>").append(groupId).append("</groupId>\n");
-            config.append("                <artifactId>").append(artifactId).append("</artifactId>\n");
-            config.append("                <version>").append(version).append("</version>\n");
+            // Create an XML object for the <plugin> element
+            XML xml = new XML("plugin");
+            xml.put("groupId", groupId);
+            xml.put("artifactId", artifactId);
+            xml.put("version", version);
 
+            // Add <configuration> elements if present
             if (!configuration.isEmpty()) {
-                config.append("                <configuration>\n");
                 for (Map.Entry<String, String> entry : configuration.entrySet()) {
-                    // TODO toXMLTree(entry.getKey(), entry.getValue())
-                    //config.append();
+                    xml.put("configuration " + entry.getKey(), entry.getValue());
                 }
-                config.append("                </configuration>\n");
             }
 
+            // Add <executions> if not empty
             if (!executions.isEmpty()) {
-                config.append("                <executions>\n");
                 for (Execution execution : executions) {
-                    config.append(execution.getConfiguration());
+                    xml.put("executions", execution.getConfiguration());
                 }
-                config.append("                </executions>\n");
             }
 
+            // Add <dependencies> if not empty
             if (!dependencies.isEmpty()) {
-                config.append("                <dependencies>\n");
                 for (Dependency dependency : dependencies) {
-                    config.append("                    <dependency>\n");
-                    config.append("                        <groupId>").append(dependency.groupId).append("</groupId>\n");
-                    config.append("                        <artifactId>").append(dependency.artifactId).append("</artifactId>\n");
-                    config.append("                        <version>").append(dependency.version).append("</version>\n");
+                    xml.put("dependencies dependency groupId", dependency.groupId);
+                    xml.put("dependencies dependency artifactId", dependency.artifactId);
+                    xml.put("dependencies dependency version", dependency.version);
                     if (dependency.scope != null) {
-                        config.append("                        <scope>").append(dependency.scope).append("</scope>\n");
+                        xml.put("dependencies dependency scope", dependency.scope);
                     }
-                    config.append("                    </dependency>\n");
                 }
-                config.append("                </dependencies>\n");
             }
-
-            config.append("            </plugin>\n");
 
             executeAfterGetConfiguration(project);
-            return config.toString();
+            return xml;
         }
     }
 
@@ -386,33 +425,36 @@ public class JPM {
             configuration.put(key, value);
         }
 
-        public String getConfiguration() {
-            StringBuilder config = new StringBuilder();
-            config.append("                    <execution>\n");
-            config.append("                        <id>").append(id).append("</id>\n");
-            if(phase != null && !phase.isEmpty())
-                config.append("                        <phase>").append(phase).append("</phase>\n");
+        public XML getConfiguration() {
+            // Create an instance of XML with the root element <execution>
+            XML xml = new XML("execution");
 
+            // Add <id> element
+            xml.put("id", id);
+
+            // Add <phase> element if it is not null or empty
+            if (phase != null && !phase.isEmpty()) {
+                xml.put("phase", phase);
+            }
+
+            // Add <goals> element if goals list is not empty
             if (!goals.isEmpty()) {
-                config.append("                        <goals>\n");
+                xml.put("goals", ""); // Placeholder for <goals> element
                 for (String goal : goals) {
-                    config.append("                            <goal>").append(goal).append("</goal>\n");
+                    xml.put("goals goal", goal);
                 }
-                config.append("                        </goals>\n");
             }
 
+            // Add <configuration> element if configuration map is not empty
             if (!configuration.isEmpty()) {
-                config.append("                        <configuration>\n");
+                xml.put("configuration", ""); // Placeholder for <configuration> element
                 for (Map.Entry<String, String> entry : configuration.entrySet()) {
-                    config.append("                            <").append(entry.getKey()).append(">")
-                            .append(entry.getValue())
-                            .append("</").append(entry.getKey()).append(">\n");
+                    xml.put("configuration " + entry.getKey(), entry.getValue());
                 }
-                config.append("                        </configuration>\n");
             }
 
-            config.append("                    </execution>\n");
-            return config.toString();
+            // Return the XML configuration as a string
+            return xml;
         }
     }
 
@@ -430,19 +472,6 @@ public class JPM {
         protected List<Dependency> dependencies = new ArrayList<>();
         protected List<Plugin> plugins = new ArrayList<>();
         protected List<String> compilerArgs = new ArrayList<>();
-
-        public Project() {
-            addDefaultPlugins();
-        }
-
-        private void addDefaultPlugins() {
-            plugins.add(new CompilerPlugin());
-            plugins.add(new JarPlugin());
-            plugins.add(new AssemblyPlugin());
-            plugins.add(new SourcePlugin());
-            plugins.add(new JavadocPlugin());
-            plugins.add(new EnforcerPlugin());
-        }
 
         public void addRepository(String url){
             repositories.add(Repository.fromUrl(url));
@@ -471,86 +500,69 @@ public class JPM {
         public void addCompilerArg(String arg) {
             compilerArgs.add(arg);
         }
-        /*
-        XML pom = new XML("project");
-            pom.putComment("project", "AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java");
-        // TODO
-         */
 
         public void generatePom() throws IOException {
+            // Create a new XML document with the root element <project>
+            XML pom = new XML("project");
+            pom.putComment("", "AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java");
+            pom.putAttributes("",
+                    "xmlns", "http://maven.apache.org/POM/4.0.0",
+                    "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",
+                    "xsi:schemaLocation", "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+            );
 
+            // Add <modelVersion> element
+            pom.put("modelVersion", "4.0.0");
 
-            StringBuilder pom = new StringBuilder();
-            pom.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-            pom.append("\n\n<!--  -->\n\n\n");
-            pom.append("<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
-            pom.append("         xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n");
-            pom.append("    <modelVersion>4.0.0</modelVersion>\n\n");
+            // Add main project identifiers
+            pom.put("groupId", groupId);
+            pom.put("artifactId", artifactId);
+            pom.put("version", version);
 
-            pom.append("    <groupId>").append(groupId).append("</groupId>\n");
-            pom.append("    <artifactId>").append(artifactId).append("</artifactId>\n");
-            pom.append("    <version>").append(version).append("</version>\n\n");
+            // Add <properties> element
+            pom.put("properties project.build.sourceEncoding", "UTF-8");
 
-            pom.append("    <properties>\n");
-            pom.append("        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n");
-            pom.append("    </properties>\n\n");
-
+            // Add <repositories> if not empty
             if (!repositories.isEmpty()) {
-                pom.append("    <repositories>\n");
                 for (Repository rep : repositories) {
-                    pom.append("        <repository>\n");
-                    pom.append("            <id>").append(rep.id).append("</id>\n");
-                    pom.append("            <url>").append(rep.url).append("</url>\n");
-                    pom.append("        </repository>\n");
+                    pom.put("repositories repository id", rep.id);
+                    pom.put("repositories repository url", rep.url);
                 }
-                pom.append("    </repositories>\n\n");
             }
 
+            // Add <dependencyManagement> if there are managed dependencies
             if (!dependenciesManaged.isEmpty()) {
-                pom.append("    <dependencyManagement>\n");
                 for (Dependency dep : dependenciesManaged) {
-                    pom.append("        <dependency>\n");
-                    pom.append("            <groupId>").append(dep.groupId).append("</groupId>\n");
-                    pom.append("            <artifactId>").append(dep.artifactId).append("</artifactId>\n");
-                    pom.append("            <version>").append(dep.version).append("</version>\n");
-                    pom.append("        </dependency>\n");
+                    pom.put("dependencyManagement dependency groupId", dep.groupId);
+                    pom.put("dependencyManagement dependency artifactId", dep.artifactId);
+                    pom.put("dependencyManagement dependency version", dep.version);
                 }
-                pom.append("    </dependencyManagement>\n\n");
             }
 
+            // Add <dependencies> if there are dependencies
             if (!dependencies.isEmpty()) {
-                pom.append("    <dependencies>\n");
                 for (Dependency dep : dependencies) {
-                    pom.append("        <dependency>\n");
-                    pom.append("            <groupId>").append(dep.groupId).append("</groupId>\n");
-                    pom.append("            <artifactId>").append(dep.artifactId).append("</artifactId>\n");
-                    pom.append("            <version>").append(dep.version).append("</version>\n");
-                    pom.append("        </dependency>\n");
+                    pom.put("dependencies dependency groupId", dep.groupId);
+                    pom.put("dependencies dependency artifactId", dep.artifactId);
+                    pom.put("dependencies dependency version", dep.version);
                 }
-                pom.append("    </dependencies>\n\n");
             }
 
-            pom.append("    <build>\n");
-            if(!plugins.isEmpty()){
-                pom.append("        <plugins>\n");
-                for (Plugin plugin : plugins) {
-                    pom.append(plugin.getConfiguration(this));
-                }
-                pom.append("        </plugins>\n\n");
+            // Add <build> section with plugins and resources
+            for (Plugin plugin : JPM.plugins) {
+                pom.put("build plugins", plugin.getConfiguration(this));
+            }
+            for (Plugin plugin : plugins) {
+                pom.put("build plugins", plugin.getConfiguration(this));
             }
 
-            pom.append("        <!-- Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering. -->\n" +
-                    "        <resources>\n" +
-                    "            <resource>\n" +
-                    "                <directory>src/main/resources</directory>\n" +
-                    "                <filtering>true</filtering>\n" +
-                    "            </resource>\n" +
-                    "        </resources>\n\n");
+            // Add resources with a comment
+            pom.putComment("build resources", "Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering.");
+            pom.put("build resources resource directory", "src/main/resources");
+            pom.put("build resources resource filtering", "true");
 
-            pom.append("    </build>\n");
-            pom.append("</project>\n");
-
-            File pomFile = new File(System.getProperty("user.dir")+"/pom.xml");
+            // Write to pom.xml
+            File pomFile = new File(System.getProperty("user.dir") + "/pom.xml");
             try (FileWriter writer = new FileWriter(pomFile)) {
                 writer.write(pom.toString());
             }
@@ -558,7 +570,11 @@ public class JPM {
         }
     }
 
+    static {
+        plugins.add(CompilerPlugin.get);
+    }
     public static class CompilerPlugin extends Plugin {
+        public static CompilerPlugin get = new CompilerPlugin();
         public CompilerPlugin() {
             super("org.apache.maven.plugins", "maven-compiler-plugin", "3.8.1");
             withBeforeGetConfiguration(project -> {
@@ -567,17 +583,19 @@ public class JPM {
 
                 // Add compiler arguments from the project
                 if (!project.compilerArgs.isEmpty()) {
-                    StringBuilder args = new StringBuilder();
                     for (String arg : project.compilerArgs) {
-                        args.append("<arg>").append(arg).append("</arg>");
+                        addConfiguration("compilerArgs arg", arg);
                     }
-                    addConfiguration("compilerArgs", args.toString());
                 }
             });
         }
     }
 
+    static {
+        plugins.add(JarPlugin.get);
+    }
     public static class JarPlugin extends Plugin {
+        public static JarPlugin get = new JarPlugin();
         public JarPlugin() {
             super("org.apache.maven.plugins", "maven-jar-plugin", "3.2.0");
             withBeforeGetConfiguration(project -> {
@@ -588,11 +606,15 @@ public class JPM {
         }
     }
 
+    static {
+        plugins.add(AssemblyPlugin.get);
+    }
     public static class AssemblyPlugin extends Plugin {
+        public static AssemblyPlugin get = new AssemblyPlugin();
         public AssemblyPlugin() {
             super("org.apache.maven.plugins", "maven-assembly-plugin", "3.3.0");
             withBeforeGetConfiguration(project -> {
-                addConfiguration("descriptorRefs", "<descriptorRef>jar-with-dependencies</descriptorRef>");
+                addConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
                 addConfiguration("archive manifest mainClass", project.mainClass);
                 addConfiguration("finalName", project.fatJarName.replace(".jar", ""));
                 addConfiguration("appendAssemblyId", "false");
@@ -604,7 +626,11 @@ public class JPM {
         }
     }
 
+    static {
+        plugins.add(SourcePlugin.get);
+    }
     public static class SourcePlugin extends Plugin {
+        public static SourcePlugin get = new SourcePlugin();
         public SourcePlugin() {
             super("org.apache.maven.plugins", "maven-source-plugin", "3.2.1");
             withBeforeGetConfiguration(project -> {
@@ -615,7 +641,11 @@ public class JPM {
         }
     }
 
+    static {
+        plugins.add(JavadocPlugin.get);
+    }
     public static class JavadocPlugin extends Plugin {
+        public static JavadocPlugin get = new JavadocPlugin();
         public JavadocPlugin() {
             super("org.apache.maven.plugins", "maven-javadoc-plugin", "3.0.0");
             withBeforeGetConfiguration(project -> {
@@ -629,14 +659,18 @@ public class JPM {
         }
     }
 
+    static {
+        plugins.add(EnforcerPlugin.get);
+    }
     public static class EnforcerPlugin extends Plugin {
+        public static EnforcerPlugin get = new EnforcerPlugin();
         public EnforcerPlugin() {
             super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.3.0");
             withBeforeGetConfiguration(project -> {
                 Execution execution = new Execution("enforce", null);
                 addExecution(execution);
                 execution.addGoal("enforce");
-                execution.addConfiguration("rules", "<dependencyConvergence/>");
+                execution.addConfiguration("rules dependencyConvergence", "");
             });
         }
     }

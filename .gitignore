@@ -25,3 +25,7 @@ replay_pid*
 /.idea/
 /build
 /lib
+/target/
+/.mvn/
+/mvnw.cmd
+/mvnw
