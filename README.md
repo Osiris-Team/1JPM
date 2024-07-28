@@ -12,7 +12,7 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 **You can also clone/download this repository since it also functions as a template.**
 
 Note that 1JPM is now using Maven under the hood, since the complexity as a fully independent build tool
-(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. It will download and use the Maven-Wrapper, generate the pom XML and then execute Maven as you can see in `main()` below:
+(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to rich and mature features and plugin ecosystem as well as seamless IDE compatibility. Basically 1JPM will download and use the Maven-Wrapper, generate the pom.xml and then execute Maven as you can see in `main()` below:
 
 ```java
 class ThisProject extends JPM.Project {
