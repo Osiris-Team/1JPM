@@ -87,3 +87,10 @@ A workaround for this would be developing a task like "minifyProject" which woul
 by sending it the above example `ThisProject` class and your current build config files (pom.xml/build.gradle),
 then prompting it something like: "Port my current Maven/Gradle project to the JPM build tool, by modifing the ThisProject class accordingly".
 If you have additional plugins also send it an example plugin from within the JPM class.
+
+## Funding
+I am actively maintaining this repository, publishing new releases and working 
+on its codebase for free, so if this project benefits you and/or your company consider 
+donating a monthly amount you seem fit. Thank you!
+
+<a href="https://www.paypal.com/donate?hosted_button_id=JNXQCWF2TF9W4"><img src="https://github.com/andreostrovsky/donate-with-paypal/raw/master/blue.svg" height="40"></a>
