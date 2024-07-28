@@ -7,7 +7,9 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 
 - Java 11 and above: `java JPM.java`
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM`
-- Earlier Java versions are not supported
+- Earlier Java versions are not supported (also make sure you use a
+[globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk)
+with JAVA_HOME set, and not JRE)
 
 **You can also clone/download this repository since it also functions as a template.**
 
