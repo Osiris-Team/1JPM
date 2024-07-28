@@ -39,18 +39,25 @@ class ThisProject extends JPM.Project {
         addCompilerArg("-Xlint:deprecation");
     }
 
-    public static void main(String[] args) throws Exception {
-        new ThisProject(Arrays.asList(args)).generatePom();
+    public static void main(String[] _args) throws Exception {
+        List<String> args = Arrays.asList(_args);
+        ThisProject project = new ThisProject(args);
+        project.generatePom();
         JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
     }
 }
 
-class ThirdPartyPlugins extends JPM.Plugins{
-    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
-    // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
+class Plugins extends JPM.Plugins{
+    // Add your Maven Plugins using the JPM.Plugin class here and
+    // take a look at "JPM.AssemblyPlugin" class further below to get started
 }
 
-// 1JPM version 2.0.1 by Osiris-Team
+class ThirdPartyPlugins extends JPM.Plugins{
+    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+    // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
+}
+
+// 1JPM version 2.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
   //...
