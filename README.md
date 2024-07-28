@@ -7,11 +7,11 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 
 - Java 11 and above: `java JPM.java`
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM`
-- Earlier Java versions are not supported (also make sure you use a
+- Earlier Java versions are not supported (make sure you use a
 [globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk)
 with JAVA_HOME set, and not JRE)
 
-**You can also clone/download this repository since it also functions as a template.**
+**Alternatively you can simply clone/download this repository since it functions as a template too.**
 
 Note that 1JPM is now using Maven under the hood, since the complexity as a fully independent build tool
 (see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to rich and mature features and plugin ecosystem as well as seamless IDE compatibility. Basically 1JPM will download and use the Maven-Wrapper, generate the pom.xml and then execute Maven as you can see in `main()` below:
