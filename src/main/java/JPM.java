@@ -36,18 +36,25 @@ class ThisProject extends JPM.Project {
         addCompilerArg("-Xlint:deprecation");
     }
 
-    public static void main(String[] args) throws Exception {
-        new ThisProject(Arrays.asList(args)).generatePom();
+    public static void main(String[] _args) throws Exception {
+        List<String> args = Arrays.asList(_args);
+        ThisProject project = new ThisProject(args);
+        project.generatePom();
         JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
     }
 }
 
-class ThirdPartyPlugins extends JPM.Plugins{
-    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
-    // (If you want to develop a plugin take a look at "JPM.Clean" class further below to get started)
+class Plugins extends JPM.Plugins{
+    // Add your Maven Plugins using the JPM.Plugin class here and
+    // take a look at "JPM.AssemblyPlugin" class further below to get started
 }
 
-// 1JPM version 2.1.1-IN_WORK by Osiris-Team: https://github.com/Osiris-Team/1JPM
+class ThirdPartyPlugins extends JPM.Plugins{
+    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+    // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
+}
+
+// 1JPM version 2.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -373,16 +380,25 @@ public class JPM {
             this.version = version;
         }
 
-        public void addConfiguration(String key, String value) {
+        public Plugin putConfiguration(String key, String value) {
             configuration.put(key, value);
+            return this;
         }
 
-        public void addExecution(Execution execution) {
+        public Execution addExecution(String id, String phase){
+            Execution execution = new Execution(id, phase);
             executions.add(execution);
+            return execution;
         }
 
-        public void addDependency(Dependency dependency) {
+        public Execution addExecution(Execution execution) {
+            executions.add(execution);
+            return execution;
+        }
+
+        public Plugin addDependency(Dependency dependency) {
             dependencies.add(dependency);
+            return this;
         }
 
         public Plugin onBeforeToXML(BiConsumer<Project, XML> code){
@@ -402,7 +418,9 @@ public class JPM {
             dependencies.clear();
         }
 
-
+        /**
+         * Usually you will override this.
+         */
         public XML toXML(Project project, XML projectXML) {
             executeBeforeToXML(project, projectXML);
 
@@ -451,12 +469,14 @@ public class JPM {
             this.configuration = new HashMap<>();
         }
 
-        public void addGoal(String goal) {
+        public Execution addGoal(String goal) {
             goals.add(goal);
+            return this;
         }
 
-        public void addConfiguration(String key, String value) {
+        public Execution putConfiguration(String key, String value) {
             configuration.put(key, value);
+            return this;
         }
 
         public XML toXML() {
@@ -473,9 +493,10 @@ public class JPM {
 
             // Add <goals> element if goals list is not empty
             if (!goals.isEmpty()) {
-                xml.put("goals", ""); // Placeholder for <goals> element
                 for (String goal : goals) {
-                    xml.put("goals goal", goal);
+                    XML goalXml = new XML("goal");
+                    goalXml.put("", goal);
+                    xml.add("goals", goalXml);
                 }
             }
 
@@ -615,13 +636,13 @@ public class JPM {
         public CompilerPlugin() {
             super("org.apache.maven.plugins", "maven-compiler-plugin", "3.8.1");
             onBeforeToXML((project, pom) -> {
-                addConfiguration("source", project.javaVersionSource);
-                addConfiguration("target", project.javaVersionTarget);
+                putConfiguration("source", project.javaVersionSource);
+                putConfiguration("target", project.javaVersionTarget);
 
                 // Add compiler arguments from the project
                 if (!project.compilerArgs.isEmpty()) {
                     for (String arg : project.compilerArgs) {
-                        addConfiguration("compilerArgs arg", arg);
+                        putConfiguration("compilerArgs arg", arg);
                     }
                 }
             });
@@ -636,9 +657,9 @@ public class JPM {
         public JarPlugin() {
             super("org.apache.maven.plugins", "maven-jar-plugin", "3.2.0");
             onBeforeToXML((project, pom) -> {
-                addConfiguration("archive manifest addClasspath", "true");
-                addConfiguration("archive manifest mainClass", project.mainClass);
-                addConfiguration("finalName", project.jarName.replace(".jar", ""));
+                putConfiguration("archive manifest addClasspath", "true");
+                putConfiguration("archive manifest mainClass", project.mainClass);
+                putConfiguration("finalName", project.jarName.replace(".jar", ""));
             });
         }
     }
@@ -651,14 +672,13 @@ public class JPM {
         public AssemblyPlugin() {
             super("org.apache.maven.plugins", "maven-assembly-plugin", "3.3.0");
             onBeforeToXML((project, pom) -> {
-                addConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
-                addConfiguration("archive manifest mainClass", project.mainClass);
-                addConfiguration("finalName", project.fatJarName.replace(".jar", ""));
-                addConfiguration("appendAssemblyId", "false");
+                putConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
+                putConfiguration("archive manifest mainClass", project.mainClass);
+                putConfiguration("finalName", project.fatJarName.replace(".jar", ""));
+                putConfiguration("appendAssemblyId", "false");
 
-                Execution execution = new Execution("make-assembly", "package");
-                execution.addGoal("single");
-                addExecution(execution);
+                addExecution("make-assembly", "package")
+                        .addGoal("single");
             });
         }
     }
@@ -671,9 +691,8 @@ public class JPM {
         public SourcePlugin() {
             super("org.apache.maven.plugins", "maven-source-plugin", "3.2.1");
             onBeforeToXML((project, pom) -> {
-                Execution execution = new Execution("attach-sources", null);
-                addExecution(execution);
-                execution.addGoal("jar");
+                addExecution("attach-sources", null)
+                        .addGoal("jar");
             });
         }
     }
@@ -686,12 +705,11 @@ public class JPM {
         public JavadocPlugin() {
             super("org.apache.maven.plugins", "maven-javadoc-plugin", "3.0.0");
             onBeforeToXML((project, pom) -> {
-                Execution execution = new Execution("resource-bundles", "package");
-                addExecution(execution);
-                execution.addGoal("resource-bundle");
-                execution.addGoal("test-resource-bundle");
-                execution.addConfiguration("doclint", "none");
-                execution.addConfiguration("detectOfflineLinks", "false");
+                addExecution("resource-bundles", "package")
+                        .addGoal("resource-bundle")
+                        .addGoal("test-resource-bundle")
+                        .putConfiguration("doclint", "none")
+                        .putConfiguration("detectOfflineLinks", "false");
             });
         }
     }
@@ -704,10 +722,9 @@ public class JPM {
         public EnforcerPlugin() {
             super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.3.0");
             onBeforeToXML((project, pom) -> {
-                Execution execution = new Execution("enforce", null);
-                addExecution(execution);
-                execution.addGoal("enforce");
-                execution.addConfiguration("rules dependencyConvergence", "");
+                addExecution("enforce", null)
+                        .addGoal("enforce")
+                        .putConfiguration("rules dependencyConvergence", "");
             });
         }
     }
