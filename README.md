@@ -15,7 +15,7 @@ with JAVA_HOME set
 **Alternatively you can simply clone/download this repository since it functions as a template too.**
 
 Note that 1JPM is now using **Maven under the hood**, since the complexity as a fully independent build tool
-(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. Basically 1JPM will download and use the Maven-Wrapper, generate the pom.xml and then execute Maven as you can see in `main()` below:
+(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. 1JPM will take care of generating the pom.xml, downloading the Maven-Wrapper, and then executing Maven as you can see in `main()` below:
 
 ```java
 class ThisProject extends JPM.Project {
