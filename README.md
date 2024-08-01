@@ -79,7 +79,7 @@ How many lines of relevant build code do we save compared to Maven?
 - 1JPM: 128 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/src/main/java/JPM.java))
 - Maven: 391 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/pom.xml))
 
-Thus we write the same config with **263 lines less** code, which is around **3x** saving when using 1JPM!
+Thus we write the same config with **263 lines less** code (which is a **3x** saving) when using 1JPM!
 
 ## Why a single file?
 
