@@ -62,6 +62,7 @@ class ThirdPartyPlugins extends JPM.Plugins{
 
 // 1JPM version 3.0.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
+public class JPM {
   //...
 }
 ```
