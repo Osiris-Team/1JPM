@@ -12,7 +12,7 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 [globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk) (not JRE)
 with JAVA_HOME set
 
-**Alternatively you can simply clone/download this repository since it functions as a template too.**
+**You can also clone/download this repository since it functions as a template too.**
 
 Below you can see the example configuration which runs the `clean package` tasks.
 This compiles and creates a jar file from your code, and additionally creates the sources,
