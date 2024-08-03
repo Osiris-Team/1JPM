@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 class ThisProject extends JPM.Project {
 
@@ -25,15 +25,21 @@ class ThisProject extends JPM.Project {
         this.jarName = "my-project.jar";
         this.fatJarName = "my-project-with-dependencies.jar";
 
-        // Add some example dependencies
-        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
-        implementation("org.apache.commons:commons-lang3:3.12.0");
         // If there are duplicate dependencies with different versions force a specific version like so:
         //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
 
-        // Add some compiler arguments
+        // Add dependencies
+        implementation("org.apache.commons:commons-lang3:3.12.0");
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+
+        // Add compiler arguments
         addCompilerArg("-Xlint:unchecked");
         addCompilerArg("-Xlint:deprecation");
+
+        // Add additional plugins
+        //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
+        //    d.putConfiguration("mainClass", this.mainClass);
+        //});
     }
 
     public static void main(String[] _args) throws Exception {
@@ -44,17 +50,12 @@ class ThisProject extends JPM.Project {
     }
 }
 
-class Plugins extends JPM.Plugins{
-    // Add your Maven Plugins using the JPM.Plugin class here and
-    // take a look at "JPM.AssemblyPlugin" class further below to get started
-}
-
 class ThirdPartyPlugins extends JPM.Plugins{
     // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
     // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
 }
 
-// 1JPM version 2.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+// 1JPM version 3.0.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -63,6 +64,11 @@ public class JPM {
     private static final String mavenWrapperScriptUrlBase = "https://raw.githubusercontent.com/apache/maven-wrapper/maven-wrapper-"+ mavenWrapperVersion +"/maven-wrapper-distribution/src/resources/";
     private static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
     private static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
+
+    static{
+        // Init this once to ensure their plugins are added if they use the static constructor
+        new ThirdPartyPlugins();
+    }
 
     public static void main(String[] args) throws Exception {
         ThisProject.main(args);
@@ -143,11 +149,24 @@ public class JPM {
     }
 
     public static class Dependency {
+        public static Dependency fromGradleString(String s){
+            String[] split = s.split(":");
+            String groupId = split.length >= 1 ? split[0] : "";
+            String artifactId = split.length >= 2 ? split[1] : "";
+            String versionId = split.length >= 3 ? split[2] : "";
+            String scope = split.length >= 4 ? split[3] : "compile";
+            Dependency dep = new Dependency(groupId, artifactId, versionId, scope);
+            if(split.length < 3) System.err.println("No version provided. This might cause issues. Dependency: "+s);
+            return dep;
+        }
+
         public String groupId;
         public String artifactId;
         public String version;
         public String scope;
         public List<Dependency> transitiveDependencies;
+        public List<Dependency> excludedDependencies = new ArrayList<>();
+        public String type = "";
 
         public Dependency(String groupId, String artifactId, String version) {
             this(groupId, artifactId, version, "compile", new ArrayList<>());
@@ -165,6 +184,15 @@ public class JPM {
             this.transitiveDependencies = transitiveDependencies;
         }
 
+        public Dependency exclude(String s){
+            return exclude(Dependency.fromGradleString(s));
+        }
+
+        public Dependency exclude(Dependency dep){
+            excludedDependencies.add(dep);
+            return dep;
+        }
+
         @Override
         public String toString() {
             return groupId + ":" + artifactId + ":" + version + ":" + scope;
@@ -174,9 +202,15 @@ public class JPM {
             XML xml = new XML("dependency");
             xml.put("groupId", groupId);
             xml.put("artifactId", artifactId);
-            xml.put("version", version);
-            if (scope != null) {
-                xml.put("scope", scope);
+            if (version != null && !version.isEmpty()) xml.put("version", version);
+            if (scope != null && !scope.isEmpty()) xml.put("scope", scope);
+            if (type != null && !type.isEmpty()) xml.put("type", type);
+
+            for (Dependency excludedDependency : excludedDependencies) {
+                XML exclusion = new XML("exclusion");
+                exclusion.put("groupId", excludedDependency.groupId);
+                exclusion.put("artifactId", excludedDependency.artifactId);
+                xml.add("exclusions", exclusion);
             }
             return xml;
         }
@@ -201,6 +235,7 @@ public class JPM {
     public static class Repository{
         public String id;
         public String url;
+        public boolean isSnapshotsAllowed = true;
 
         public Repository(String id, String url) {
             this.id = id;
@@ -216,6 +251,7 @@ public class JPM {
             XML xml = new XML("repository");
             xml.put("id", id);
             xml.put("url", url);
+            if(!isSnapshotsAllowed) xml.put("snapshots enabled", "false");
             return xml;
         }
     }
@@ -246,7 +282,7 @@ public class JPM {
 
         // Method to append another XML object to a specific element in this XML document.
         public XML add(String key, XML otherXML) {
-            Element parentElement = getOrCreateElement(key);
+            Element parentElement = getElementOrCreate(key);
             Node importedNode = document.importNode(otherXML.root, true);
             parentElement.appendChild(importedNode);
             return this;
@@ -254,7 +290,7 @@ public class JPM {
 
         // Method to add a value to the XML document at the specified path.
         public XML put(String key, String value) {
-            Element currentElement = getOrCreateElement(key);
+            Element currentElement = getElementOrCreate(key);
             if(value != null && !value.isEmpty())
                 currentElement.setTextContent(value);
             return this;
@@ -262,7 +298,7 @@ public class JPM {
 
         // Method to add a comment to the XML document at the specified path.
         public XML putComment(String key, String comment) {
-            Element currentElement = getOrCreateElement(key);
+            Element currentElement = getElementOrCreate(key);
             Node parentNode = currentElement.getParentNode();
             Node commentNode = document.createComment(comment);
 
@@ -276,7 +312,7 @@ public class JPM {
                 throw new IllegalArgumentException("Attributes must be in key-value pairs.");
             }
 
-            Element currentElement = getOrCreateElement(key);
+            Element currentElement = getElementOrCreate(key);
 
             // Iterate over pairs of strings to set each attribute on the element.
             for (int i = 0; i < attributes.length; i += 2) {
@@ -289,7 +325,7 @@ public class JPM {
 
         // Method to add attributes to an element in the XML document at the specified path.
         public XML putAttributes(String key, Map<String, String> attributes) {
-            Element currentElement = getOrCreateElement(key);
+            Element currentElement = getElementOrCreate(key);
 
             // Set each attribute in the map on the element.
             for (Map.Entry<String, String> entry : attributes.entrySet()) {
@@ -298,8 +334,26 @@ public class JPM {
             return this;
         }
 
+        public XML remove(String key) {
+            String[] path = key.split(" ");
+            Element element = getElementOrNull(path);
+            if (element != null && element.getParentNode() != null) {
+                element.getParentNode().removeChild(element);
+            }
+            return this;
+        }
+
+        public XML rename(String oldKey, String newName) {
+            String[] path = oldKey.split(" ");
+            Element element = getElementOrNull(path);
+            if (element != null) {
+                document.renameNode(element, null, newName);
+            }
+            return this;
+        }
+
         // Helper method to traverse or create elements based on a path.
-        private Element getOrCreateElement(String key) {
+        private Element getElementOrCreate(String key) {
             if (key == null || key.trim().isEmpty()) return root;
             String[] path = key.split(" ");
             Element currentElement = root;
@@ -322,6 +376,24 @@ public class JPM {
                 currentElement = childElement;
             }
 
+            return currentElement;
+        }
+
+        private Element getElementOrNull(String[] path) {
+            Element currentElement = root;
+            for (String nodeName : path) {
+                NodeList children = currentElement.getChildNodes();
+                boolean found = false;
+                for (int i = 0; i < children.getLength(); i++) {
+                    Node child = children.item(i);
+                    if (child.getNodeType() == Node.ELEMENT_NODE && child.getNodeName().equals(nodeName)) {
+                        currentElement = (Element) child;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) return null;
+            }
             return currentElement;
         }
 
@@ -362,17 +434,10 @@ public class JPM {
     }
 
     public static class Plugin {
-        public List<BiConsumer<Project, XML>> beforeToXMLListeners = new CopyOnWriteArrayList<>();
+        public List<Consumer<Details>> beforeToXMLListeners = new CopyOnWriteArrayList<>();
         protected String groupId;
         protected String artifactId;
         protected String version;
-
-        // Gets cleared after execute
-        protected Map<String, String> configuration = new HashMap<>();
-        // Gets cleared after execute
-        protected List<Execution> executions = new ArrayList<>();
-        // Gets cleared after execute
-        protected List<Dependency> dependencies = new ArrayList<>();
 
         public Plugin(String groupId, String artifactId, String version) {
             this.groupId = groupId;
@@ -380,79 +445,87 @@ public class JPM {
             this.version = version;
         }
 
-        public Plugin putConfiguration(String key, String value) {
-            configuration.put(key, value);
-            return this;
-        }
-
-        public Execution addExecution(String id, String phase){
-            Execution execution = new Execution(id, phase);
-            executions.add(execution);
-            return execution;
-        }
-
-        public Execution addExecution(Execution execution) {
-            executions.add(execution);
-            return execution;
-        }
-
-        public Plugin addDependency(Dependency dependency) {
-            dependencies.add(dependency);
-            return this;
-        }
-
-        public Plugin onBeforeToXML(BiConsumer<Project, XML> code){
+        public Plugin onBeforeToXML(Consumer<Details> code){
             beforeToXMLListeners.add(code);
             return this;
         }
 
-        private void executeBeforeToXML(Project project, XML projectXML) {
-            for (BiConsumer<Project, XML> code : beforeToXMLListeners) {
-                code.accept(project, projectXML);
+        private void executeBeforeToXML(Details details) {
+            for (Consumer<Details> code : beforeToXMLListeners) {
+                code.accept(details);
             }
-        }
-
-        private void executeAfterToXML(Project project) {
-            configuration.clear();
-            executions.clear();
-            dependencies.clear();
         }
 
         /**
          * Usually you will override this.
          */
         public XML toXML(Project project, XML projectXML) {
-            executeBeforeToXML(project, projectXML);
+            Details details = new Details(this, project, projectXML);
+            executeBeforeToXML(details);
 
             // Create an XML object for the <plugin> element
             XML xml = new XML("plugin");
             xml.put("groupId", groupId);
             xml.put("artifactId", artifactId);
-            xml.put("version", version);
+            if(version != null && !version.isEmpty()) xml.put("version", version);
 
             // Add <configuration> elements if present
-            if (!configuration.isEmpty()) {
-                for (Map.Entry<String, String> entry : configuration.entrySet()) {
+            if (!details.configuration.isEmpty()) {
+                for (Map.Entry<String, String> entry : details.configuration.entrySet()) {
                     xml.put("configuration " + entry.getKey(), entry.getValue());
                 }
             }
 
             // Add <executions> if not empty
-            if (!executions.isEmpty()) {
-                for (Execution execution : executions) {
+            if (!details.executions.isEmpty()) {
+                for (Execution execution : details.executions) {
                     xml.add("executions", execution.toXML());
                 }
             }
 
             // Add <dependencies> if not empty
-            if (!dependencies.isEmpty()) {
-                for (Dependency dependency : dependencies) {
+            if (!details.dependencies.isEmpty()) {
+                for (Dependency dependency : details.dependencies) {
                     xml.add("dependencies", dependency.toXML());
                 }
             }
-
-            executeAfterToXML(project);
             return xml;
+        }
+
+        public static class Details {
+            public Plugin plugin;
+            public Project project;
+            public XML xml;
+            public Map<String, String> configuration = new HashMap<>();
+            public List<Execution> executions = new ArrayList<>();
+            public List<Dependency> dependencies = new ArrayList<>();
+
+            public Details(Plugin plugin, Project project, XML xml) {
+                this.plugin = plugin;
+                this.project = project;
+                this.xml = xml;
+            }
+
+            public Details putConfiguration(String key, String value) {
+                configuration.put(key, value);
+                return this;
+            }
+
+            public Execution addExecution(String id, String phase){
+                Execution execution = new Execution(id, phase);
+                executions.add(execution);
+                return execution;
+            }
+
+            public Execution addExecution(Execution execution) {
+                executions.add(execution);
+                return execution;
+            }
+
+            public Details addDependency(Dependency dependency) {
+                dependencies.add(dependency);
+                return this;
+            }
         }
     }
 
@@ -484,7 +557,7 @@ public class JPM {
             XML xml = new XML("execution");
 
             // Add <id> element
-            xml.put("id", id);
+            if(id != null && !id.isEmpty()) xml.put("id", id);
 
             // Add <phase> element if it is not null or empty
             if (phase != null && !phase.isEmpty()) {
@@ -525,99 +598,147 @@ public class JPM {
         protected List<Repository> repositories = new ArrayList<>();
         protected List<Dependency> dependenciesManaged = new ArrayList<>();
         protected List<Dependency> dependencies = new ArrayList<>();
-        protected List<Plugin> plugins = new ArrayList<>();
+        protected List<Plugin> plugins = JPM.plugins;
         protected List<String> compilerArgs = new ArrayList<>();
+        protected List<Project> profiles = new ArrayList<>();
 
-        public void addRepository(String url){
-            repositories.add(Repository.fromUrl(url));
+        public Repository addRepository(String url, boolean isSnapshotsAllowed){
+            Repository repository = addRepository(url);
+            repository.isSnapshotsAllowed = isSnapshotsAllowed;
+            return repository;
         }
 
-        public void testImplementation(String s){
-            String[] split = s.split(":");
-            if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
-            addDependency(split[0], split[1], split[2]).scope = "test";
+        public Repository addRepository(String url){
+            Repository repository = Repository.fromUrl(url);
+            repositories.add(repository);
+            return repository;
         }
 
-        public void implementation(String s){
-            String[] split = s.split(":");
-            if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
-            addDependency(split[0], split[1], split[2]);
+        public Dependency testImplementation(String s){
+            Dependency dep = addDependency(Dependency.fromGradleString(s));
+            dep.scope = "test";
+            return dep;
+        }
+
+        public Dependency implementation(String s){
+            return addDependency(Dependency.fromGradleString(s));
         }
 
         public Dependency addDependency(String groupId, String artifactId, String version) {
             Dependency dep = new Dependency(groupId, artifactId, version);
+            return addDependency(dep);
+        }
+
+        public Dependency addDependency(Dependency dep) {
             dependencies.add(dep);
             return dep;
         }
 
-        public void forceImplementation(String s){
-            String[] split = s.split(":");
-            if(split.length < 3) throw new RuntimeException("Does not contain all required details: "+s);
-            forceDependency(split[0], split[1], split[2]);
+        public Dependency forceImplementation(String s){
+            return forceDependency(Dependency.fromGradleString(s));
         }
 
-        public void forceDependency(String groupId, String artifactId, String version) {
-            dependenciesManaged.add(new Dependency(groupId, artifactId, version));
+        public Dependency forceDependency(String groupId, String artifactId, String version) {
+            Dependency dep = new Dependency(groupId, artifactId, version);
+            return forceDependency(dep);
+        }
+
+        public Dependency forceDependency(Dependency dep) {
+            dependenciesManaged.add(dep);
+            return dep;
+        }
+
+        /**
+         * Adds the provided plugin or replaces the existing plugin with the provided plugin. <br>
+         * This is a utility method to easily add plugins without needing to extend {@link Plugin}. <br>
+         * If you want to modify an existing plugin do this by using the global reference like {@link AssemblyPlugin#get} directly. <br>
+         *
+         * @param s plugin details in Gradle string format: "groupId:artifactId:version"
+         * @param onBeforeToXML executed before the xml for this plugin is generated, provides context details in parameter.
+         */
+        public Plugin putPlugin(String s, Consumer<Plugin.Details> onBeforeToXML){
+            Dependency dep = Dependency.fromGradleString(s);
+            Plugin pl = new Plugin(dep.groupId, dep.artifactId, dep.version);
+            this.plugins.removeIf(pl2 -> pl2.groupId.equals(pl.groupId) && pl2.artifactId.equals(pl.artifactId));
+            pl.onBeforeToXML(onBeforeToXML);
+            this.plugins.add(pl);
+            return pl;
+        }
+
+        public Profile addProfile(String id){
+            Profile p = new Profile(id);
+            return addProfile(p);
+        }
+
+        public Profile addProfile(Profile p){
+            profiles.add(p);
+            return p;
         }
 
         public void addCompilerArg(String arg) {
             compilerArgs.add(arg);
         }
 
-        public void generatePom() throws IOException {
+        public XML toXML(){
             // Create a new XML document with the root element <project>
-            XML pom = new XML("project");
-            pom.putComment("", "\n\n\n\nAUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java\n\n\n\n");
-            pom.putAttributes("",
+            XML xml = new XML("project");
+            xml.putComment("", "\n\n\n\nAUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java\n\n\n\n");
+            xml.putAttributes("",
                     "xmlns", "http://maven.apache.org/POM/4.0.0",
                     "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",
                     "xsi:schemaLocation", "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
             );
 
             // Add <modelVersion> element
-            pom.put("modelVersion", "4.0.0");
+            xml.put("modelVersion", "4.0.0");
 
             // Add main project identifiers
-            pom.put("groupId", groupId);
-            pom.put("artifactId", artifactId);
-            pom.put("version", version);
+            xml.put("groupId", groupId);
+            xml.put("artifactId", artifactId);
+            xml.put("version", version);
 
             // Add <properties> element
-            pom.put("properties project.build.sourceEncoding", "UTF-8");
+            xml.put("properties project.build.sourceEncoding", "UTF-8");
 
             // Add <repositories> if not empty
             if (!repositories.isEmpty()) {
                 for (Repository rep : repositories) {
-                    pom.add("repositories", rep.toXML());
+                    xml.add("repositories", rep.toXML());
                 }
             }
 
             // Add <dependencyManagement> if there are managed dependencies
             if (!dependenciesManaged.isEmpty()) {
                 for (Dependency dep : dependenciesManaged) {
-                    pom.add("dependencyManagement dependencies", dep.toXML());
+                    xml.add("dependencyManagement dependencies", dep.toXML());
                 }
             }
 
             // Add <dependencies> if there are dependencies
             if (!dependencies.isEmpty()) {
                 for (Dependency dep : dependencies) {
-                    pom.add("dependencies", dep.toXML());
+                    xml.add("dependencies", dep.toXML());
                 }
             }
 
             // Add <build> section with plugins and resources
-            for (Plugin plugin : JPM.plugins) {
-                pom.add("build plugins", plugin.toXML(this, pom));
-            }
-            for (Plugin plugin : plugins) {
-                pom.add("build plugins", plugin.toXML(this, pom));
+            for (Plugin plugin : this.plugins) {
+                xml.add("build plugins", plugin.toXML(this, xml));
             }
 
             // Add resources with a comment
-            pom.putComment("build resources", "Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering.");
-            pom.put("build resources resource directory", "src/main/resources");
-            pom.put("build resources resource filtering", "true");
+            xml.putComment("build resources", "Sometimes unfiltered resources cause unexpected behaviour, thus enable filtering.");
+            xml.put("build resources resource directory", "src/main/resources");
+            xml.put("build resources resource filtering", "true");
+
+            for (Project profile : profiles) {
+                xml.add("profiles", profile.toXML());
+            }
+            return xml;
+        }
+
+        public void generatePom() throws IOException {
+            XML pom = toXML();
 
             // Write to pom.xml
             File pomFile = new File(System.getProperty("user.dir") + "/pom.xml");
@@ -628,6 +749,43 @@ public class JPM {
         }
     }
 
+    public static class Profile extends Project{
+        public String id;
+
+        public Profile(String id) {
+            this.id = id;
+            this.plugins = new ArrayList<>(); // Remove default plugins and have separate plugins list
+        }
+
+        @Override
+        public XML toXML() {
+            XML xml = new XML("profile");
+            xml.put("id", id);
+
+            // Add <repositories> if not empty
+            for (Repository rep : repositories) {
+                xml.add("repositories", rep.toXML());
+            }
+
+            // Add <dependencyManagement> if there are managed dependencies
+            for (Dependency dep : dependenciesManaged) {
+                xml.add("dependencyManagement dependencies", dep.toXML());
+            }
+
+            // Add <dependencies> if there are dependencies
+            for (Dependency dep : dependencies) {
+                xml.add("dependencies", dep.toXML());
+            }
+
+            // Add <build> section with plugins and resources
+            for (Plugin plugin : this.plugins) {
+                xml.add("build plugins", plugin.toXML(this, xml));
+            }
+
+            return xml;
+        }
+    }
+
     static {
         plugins.add(CompilerPlugin.get);
     }
@@ -635,14 +793,14 @@ public class JPM {
         public static CompilerPlugin get = new CompilerPlugin();
         public CompilerPlugin() {
             super("org.apache.maven.plugins", "maven-compiler-plugin", "3.8.1");
-            onBeforeToXML((project, pom) -> {
-                putConfiguration("source", project.javaVersionSource);
-                putConfiguration("target", project.javaVersionTarget);
+            onBeforeToXML(d -> {
+                d.putConfiguration("source", d.project.javaVersionSource);
+                d.putConfiguration("target", d.project.javaVersionTarget);
 
                 // Add compiler arguments from the project
-                if (!project.compilerArgs.isEmpty()) {
-                    for (String arg : project.compilerArgs) {
-                        putConfiguration("compilerArgs arg", arg);
+                if (!d.project.compilerArgs.isEmpty()) {
+                    for (String arg : d.project.compilerArgs) {
+                        d.putConfiguration("compilerArgs arg", arg);
                     }
                 }
             });
@@ -656,10 +814,10 @@ public class JPM {
         public static JarPlugin get = new JarPlugin();
         public JarPlugin() {
             super("org.apache.maven.plugins", "maven-jar-plugin", "3.2.0");
-            onBeforeToXML((project, pom) -> {
-                putConfiguration("archive manifest addClasspath", "true");
-                putConfiguration("archive manifest mainClass", project.mainClass);
-                putConfiguration("finalName", project.jarName.replace(".jar", ""));
+            onBeforeToXML(d -> {
+                d.putConfiguration("archive manifest addClasspath", "true");
+                d.putConfiguration("archive manifest mainClass", d.project.mainClass);
+                d.putConfiguration("finalName", d.project.jarName.replace(".jar", ""));
             });
         }
     }
@@ -671,13 +829,13 @@ public class JPM {
         public static AssemblyPlugin get = new AssemblyPlugin();
         public AssemblyPlugin() {
             super("org.apache.maven.plugins", "maven-assembly-plugin", "3.3.0");
-            onBeforeToXML((project, pom) -> {
-                putConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
-                putConfiguration("archive manifest mainClass", project.mainClass);
-                putConfiguration("finalName", project.fatJarName.replace(".jar", ""));
-                putConfiguration("appendAssemblyId", "false");
+            onBeforeToXML(d -> {
+                d.putConfiguration("descriptorRefs descriptorRef", "jar-with-dependencies");
+                d.putConfiguration("archive manifest mainClass", d.project.mainClass);
+                d.putConfiguration("finalName", d.project.fatJarName.replace(".jar", ""));
+                d.putConfiguration("appendAssemblyId", "false");
 
-                addExecution("make-assembly", "package")
+                d.addExecution("make-assembly", "package")
                         .addGoal("single");
             });
         }
@@ -690,8 +848,8 @@ public class JPM {
         public static SourcePlugin get = new SourcePlugin();
         public SourcePlugin() {
             super("org.apache.maven.plugins", "maven-source-plugin", "3.2.1");
-            onBeforeToXML((project, pom) -> {
-                addExecution("attach-sources", null)
+            onBeforeToXML(d -> {
+                d.addExecution("attach-sources", null)
                         .addGoal("jar");
             });
         }
@@ -704,8 +862,8 @@ public class JPM {
         public static JavadocPlugin get = new JavadocPlugin();
         public JavadocPlugin() {
             super("org.apache.maven.plugins", "maven-javadoc-plugin", "3.0.0");
-            onBeforeToXML((project, pom) -> {
-                addExecution("resource-bundles", "package")
+            onBeforeToXML(d -> {
+                d.addExecution("resource-bundles", "package")
                         .addGoal("resource-bundle")
                         .addGoal("test-resource-bundle")
                         .putConfiguration("doclint", "none")
@@ -721,8 +879,8 @@ public class JPM {
         public static EnforcerPlugin get = new EnforcerPlugin();
         public EnforcerPlugin() {
             super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.3.0");
-            onBeforeToXML((project, pom) -> {
-                addExecution("enforce", null)
+            onBeforeToXML(d -> {
+                d.addExecution("enforce", null)
                         .addGoal("enforce")
                         .putConfiguration("rules dependencyConvergence", "");
             });

@@ -29,15 +29,21 @@ class ThisProject extends JPM.Project {
         this.jarName = "my-project.jar";
         this.fatJarName = "my-project-with-dependencies.jar";
 
-        // Add some example dependencies
-        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
-        implementation("org.apache.commons:commons-lang3:3.12.0");
         // If there are duplicate dependencies with different versions force a specific version like so:
         //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
 
-        // Add some compiler arguments
+        // Add dependencies
+        implementation("org.apache.commons:commons-lang3:3.12.0");
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+
+        // Add compiler arguments
         addCompilerArg("-Xlint:unchecked");
         addCompilerArg("-Xlint:deprecation");
+
+        // Add additional plugins
+        //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
+        //    d.putConfiguration("mainClass", this.mainClass);
+        //});
     }
 
     public static void main(String[] _args) throws Exception {
@@ -48,19 +54,13 @@ class ThisProject extends JPM.Project {
     }
 }
 
-class Plugins extends JPM.Plugins{
-    // Add your Maven Plugins using the JPM.Plugin class here and
-    // take a look at "JPM.AssemblyPlugin" class further below to get started
-}
-
 class ThirdPartyPlugins extends JPM.Plugins{
     // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
     // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
 }
 
-// 1JPM version 2.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+// 1JPM version 3.0.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
-public class JPM {
   //...
 }
 ```
@@ -99,7 +99,7 @@ A workaround for this would be developing a task like "minifyProject" which woul
 
 ## Tipps
 - You can use ChatGTP (or another LLM) to easily port your current Maven/Gradle based project over to 1JPM,
-by sending it the above example `ThisProject` class and your current build config files (pom.xml/build.gradle),
+by sending it the above example `ThisProject` class and your current build details files (pom.xml/build.gradle),
 then prompting it something like: "Port my current Maven/Gradle project to the JPM build tool, by modifing the ThisProject class accordingly".
 If you have additional plugins also send it an example plugin from within the JPM class.
 
