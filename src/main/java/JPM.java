@@ -55,15 +55,15 @@ class ThirdPartyPlugins extends JPM.Plugins{
     // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
 }
 
-// 1JPM version 3.0.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+// 1JPM version 3.0.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
 // To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
     public static final List<Plugin> plugins = new ArrayList<>();
-    private static final String mavenVersion = "3.9.8";
-    private static final String mavenWrapperVersion = "3.3.2";
-    private static final String mavenWrapperScriptUrlBase = "https://raw.githubusercontent.com/apache/maven-wrapper/maven-wrapper-"+ mavenWrapperVersion +"/maven-wrapper-distribution/src/resources/";
-    private static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
-    private static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
+    public static final String mavenVersion = "3.9.8";
+    public static final String mavenWrapperVersion = "3.3.2";
+    public static final String mavenWrapperScriptUrlBase = "https://raw.githubusercontent.com/apache/maven-wrapper/maven-wrapper-"+ mavenWrapperVersion +"/maven-wrapper-distribution/src/resources/";
+    public static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
+    public static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
 
     static{
         // Init this once to ensure their plugins are added if they use the static constructor
@@ -106,7 +106,7 @@ public class JPM {
             throw new RuntimeException("Maven ("+mavenWrapperFile.getName()+") finished with an error ("+result.exitValue()+"): "+mavenWrapperFile.getAbsolutePath());
     }
 
-    private static void downloadMavenWrapper(File script) throws IOException {
+    public static void downloadMavenWrapper(File script) throws IOException {
         String wrapperUrl = mavenWrapperScriptUrlBase + script.getName();
 
         System.out.println("Downloading file from: " + wrapperUrl);
@@ -115,7 +115,7 @@ public class JPM {
         Files.copy(url.openStream(), script.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
-    private static void downloadMavenWrapperJar(File jar) throws IOException {
+    public static void downloadMavenWrapperJar(File jar) throws IOException {
         String wrapperUrl = mavenWrapperJarUrl;
 
         System.out.println("Downloading file from: " + wrapperUrl);
@@ -124,7 +124,7 @@ public class JPM {
         Files.copy(url.openStream(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
-    private static void createMavenWrapperProperties(File propertiesFile) throws IOException {
+    public static void createMavenWrapperProperties(File propertiesFile) throws IOException {
         // Create the .mvn directory if it doesn't exist
         File mvnDir = propertiesFile.getParentFile();
         if (!mvnDir.exists()) {
@@ -257,8 +257,8 @@ public class JPM {
     }
 
     public static class XML {
-        private Document document;
-        private Element root;
+        public Document document;
+        public Element root;
 
         // Constructor initializes the XML document with a root element.
         public XML(String rootName) {
@@ -435,9 +435,9 @@ public class JPM {
 
     public static class Plugin {
         public List<Consumer<Details>> beforeToXMLListeners = new CopyOnWriteArrayList<>();
-        protected String groupId;
-        protected String artifactId;
-        protected String version;
+        public String groupId;
+        public String artifactId;
+        public String version;
 
         public Plugin(String groupId, String artifactId, String version) {
             this.groupId = groupId;
@@ -530,10 +530,10 @@ public class JPM {
     }
 
     public static class Execution {
-        private String id;
-        private String phase;
-        private List<String> goals;
-        private Map<String, String> configuration;
+        public String id;
+        public String phase;
+        public List<String> goals;
+        public Map<String, String> configuration;
 
         public Execution(String id, String phase) {
             this.id = id;
@@ -587,20 +587,20 @@ public class JPM {
     }
 
     public static class Project {
-        protected String jarName = "output.jar";
-        protected String fatJarName = "output-fat.jar";
-        protected String mainClass = "com.example.Main";
-        protected String groupId = "com.example";
-        protected String artifactId = "project";
-        protected String version = "1.0.0";
-        protected String javaVersionSource = "8";
-        protected String javaVersionTarget = "8";
-        protected List<Repository> repositories = new ArrayList<>();
-        protected List<Dependency> dependenciesManaged = new ArrayList<>();
-        protected List<Dependency> dependencies = new ArrayList<>();
-        protected List<Plugin> plugins = JPM.plugins;
-        protected List<String> compilerArgs = new ArrayList<>();
-        protected List<Project> profiles = new ArrayList<>();
+        public String jarName = "output.jar";
+        public String fatJarName = "output-fat.jar";
+        public String mainClass = "com.example.Main";
+        public String groupId = "com.example";
+        public String artifactId = "project";
+        public String version = "1.0.0";
+        public String javaVersionSource = "8";
+        public String javaVersionTarget = "8";
+        public List<Repository> repositories = new ArrayList<>();
+        public List<Dependency> dependenciesManaged = new ArrayList<>();
+        public List<Dependency> dependencies = new ArrayList<>();
+        public List<Plugin> plugins = JPM.plugins;
+        public List<String> compilerArgs = new ArrayList<>();
+        public List<Project> profiles = new ArrayList<>();
 
         public Repository addRepository(String url, boolean isSnapshotsAllowed){
             Repository repository = addRepository(url);
