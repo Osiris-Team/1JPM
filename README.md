@@ -21,6 +21,9 @@ javadoc and with-dependencies jars.
 ```java
 public class JPM {
     public static class ThisProject extends JPM.Project {
+        public ThisProject() throws IOException, InterruptedException {
+            this(null);
+        }
         public ThisProject(List<String> args) throws IOException, InterruptedException {
             // Override default configurations
             this.groupId = "com.mycompany.myproject";
@@ -47,9 +50,11 @@ public class JPM {
             //});
 
             // Execute build
-            generatePom();
-            if(!args.contains("skipMaven"))
-                JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+            if(args != null){
+                generatePom();
+                if(!args.contains("skipMaven"))
+                    JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"  
+            }
         }
     }
 
