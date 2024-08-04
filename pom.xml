@@ -3,13 +3,13 @@
 
 
 
-AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java
+AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/com/mycompany/myproject/JPM.java
 
 
 
 --><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.mycompany</groupId>
+    <groupId>com.mycompany.myproject</groupId>
     <artifactId>my-project</artifactId>
     <version>1.0.0</version>
     <properties>
@@ -17,16 +17,16 @@ AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM
     </properties>
     <dependencies>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.3</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>
@@ -50,7 +50,7 @@ AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.mycompany.MyMainClass</mainClass>
+                            <mainClass>com.mycompany.myproject.MyMainClass</mainClass>
                             <addClasspath>true</addClasspath>
                         </manifest>
                     </archive>
@@ -67,7 +67,7 @@ AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>com.mycompany.MyMainClass</mainClass>
+                            <mainClass>com.mycompany.myproject.MyMainClass</mainClass>
                         </manifest>
                     </archive>
                     <finalName>my-project-with-dependencies</finalName>

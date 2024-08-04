@@ -1,4 +1,4 @@
-package com.mycompany;
+package com.mycompany.myproject;
 
 public class MyMainClass {
     public static void main(String[] args) {

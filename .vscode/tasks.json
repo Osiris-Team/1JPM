@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "java",
+      "args": [
+        "./src/main/java/com/mycompany/myproject/JPM.java"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "sync",
+      "type": "shell",
+      "command": "java",
+      "args": [
+        "./src/main/java/com/mycompany/myproject/JPM.java",
+        "skipMaven"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

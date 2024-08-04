@@ -1,4 +1,4 @@
-package com.mycompany;
+package com.mycompany.myproject;
 
 import static org.junit.jupiter.api.Assertions.*;
 class MyMainClassTest {

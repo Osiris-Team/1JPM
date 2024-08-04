@@ -1,3 +1,5 @@
+package com.mycompany.myproject;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -14,50 +16,47 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-class ThisProject extends JPM.Project {
-
-    public ThisProject(List<String> args) {
-        // Override default configurations
-        this.groupId = "com.mycompany";
-        this.artifactId = "my-project";
-        this.version = "1.0.0";
-        this.mainClass = "com.mycompany.MyMainClass";
-        this.jarName = "my-project.jar";
-        this.fatJarName = "my-project-with-dependencies.jar";
-
-        // If there are duplicate dependencies with different versions force a specific version like so:
-        //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
-
-        // Add dependencies
-        implementation("org.apache.commons:commons-lang3:3.12.0");
-        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
-
-        // Add compiler arguments
-        addCompilerArg("-Xlint:unchecked");
-        addCompilerArg("-Xlint:deprecation");
-
-        // Add additional plugins
-        //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
-        //    d.putConfiguration("mainClass", this.mainClass);
-        //});
-    }
-
-    public static void main(String[] _args) throws Exception {
-        List<String> args = Arrays.asList(_args);
-        ThisProject project = new ThisProject(args);
-        project.generatePom();
-        JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
-    }
-}
-
-class ThirdPartyPlugins extends JPM.Plugins{
-    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
-    // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
-}
-
-// 1JPM version 3.0.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
-// To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
+    public static class ThisProject extends JPM.Project {
+        public ThisProject(List<String> args) throws IOException, InterruptedException {
+            // Override default configurations
+            this.groupId = "com.mycompany.myproject";
+            this.artifactId = "my-project";
+            this.version = "1.0.0";
+            this.mainClass = "com.mycompany.myproject.MyMainClass";
+            this.jarName = "my-project.jar";
+            this.fatJarName = "my-project-with-dependencies.jar";
+
+            // If there are duplicate dependencies with different versions force a specific version like so:
+            //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
+
+            // Add dependencies
+            implementation("org.apache.commons:commons-lang3:3.12.0");
+            testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+
+            // Add compiler arguments
+            addCompilerArg("-Xlint:unchecked");
+            addCompilerArg("-Xlint:deprecation");
+
+            // Add additional plugins
+            //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
+            //    d.putConfiguration("mainClass", this.mainClass);
+            //});
+
+            // Execute build
+            generatePom();
+            if(!args.contains("skipMaven"))
+                JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+        }
+    }
+
+    public static class ThirdPartyPlugins extends JPM.Plugins{
+        // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+        // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
+    }
+
+    // 1JPM version 3.0.3 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // To upgrade JPM, replace everything below with its newer version
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
     public static final String mavenWrapperVersion = "3.3.2";
@@ -71,7 +70,7 @@ public class JPM {
     }
 
     public static void main(String[] args) throws Exception {
-        ThisProject.main(args);
+        new ThisProject(new ArrayList<>(Arrays.asList(args)));
     }
 
     public static void executeMaven(String... args) throws IOException, InterruptedException {
@@ -682,7 +681,9 @@ public class JPM {
         public XML toXML(){
             // Create a new XML document with the root element <project>
             XML xml = new XML("project");
-            xml.putComment("", "\n\n\n\nAUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/JPM.java\n\n\n\n");
+            String jpmPackagePath = "/"+this.getClass().getPackage().getName().replace(".", "/");
+            xml.putComment("", "\n\n\n\nAUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java"+
+                    jpmPackagePath+"/JPM.java\n\n\n\n");
             xml.putAttributes("",
                     "xmlns", "http://maven.apache.org/POM/4.0.0",
                     "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",

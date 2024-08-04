@@ -19,51 +19,47 @@ This compiles and creates a jar file from your code, and additionally creates th
 javadoc and with-dependencies jars.
 
 ```java
-class ThisProject extends JPM.Project {
-
-    public ThisProject(List<String> args) {
-        // Override default configurations
-        this.groupId = "com.mycompany";
-        this.artifactId = "my-project";
-        this.version = "1.0.0";
-        this.mainClass = "com.mycompany.MyMainClass";
-        this.jarName = "my-project.jar";
-        this.fatJarName = "my-project-with-dependencies.jar";
-
-        // If there are duplicate dependencies with different versions force a specific version like so:
-        //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
-
-        // Add dependencies
-        implementation("org.apache.commons:commons-lang3:3.12.0");
-        testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
-
-        // Add compiler arguments
-        addCompilerArg("-Xlint:unchecked");
-        addCompilerArg("-Xlint:deprecation");
-
-        // Add additional plugins
-        //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
-        //    d.putConfiguration("mainClass", this.mainClass);
-        //});
-    }
-
-    public static void main(String[] _args) throws Exception {
-        List<String> args = Arrays.asList(_args);
-        ThisProject project = new ThisProject(args);
-        project.generatePom();
-        JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
-    }
-}
-
-class ThirdPartyPlugins extends JPM.Plugins{
-    // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
-    // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
-}
-
-// 1JPM version 3.0.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
-// To upgrade JPM, replace the JPM class below with its newer version
 public class JPM {
-  //...
+    public static class ThisProject extends JPM.Project {
+        public ThisProject(List<String> args) throws IOException, InterruptedException {
+            // Override default configurations
+            this.groupId = "com.mycompany.myproject";
+            this.artifactId = "my-project";
+            this.version = "1.0.0";
+            this.mainClass = "com.mycompany.myproject.MyMainClass";
+            this.jarName = "my-project.jar";
+            this.fatJarName = "my-project-with-dependencies.jar";
+
+            // If there are duplicate dependencies with different versions force a specific version like so:
+            //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
+
+            // Add dependencies
+            implementation("org.apache.commons:commons-lang3:3.12.0");
+            testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+
+            // Add compiler arguments
+            addCompilerArg("-Xlint:unchecked");
+            addCompilerArg("-Xlint:deprecation");
+
+            // Add additional plugins
+            //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
+            //    d.putConfiguration("mainClass", this.mainClass);
+            //});
+
+            // Execute build
+            generatePom();
+            if(!args.contains("skipMaven"))
+                JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+        }
+    }
+
+    public static class ThirdPartyPlugins extends JPM.Plugins{
+        // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
+        // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
+    }
+
+    // 1JPM version 3.0.3 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // To upgrade JPM, replace everything below with its newer version
 }
 ```
 
