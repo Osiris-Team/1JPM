@@ -2,8 +2,8 @@
 1 Java Project Manager (1JPM), is a Maven/Gradle alternative with a twist.
 It's a single Java file itself, which should be edited by you to configure your project.
 
-Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file is Java code too.
-**Thus to build your project, [download/copy the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) into your project, open a terminal and execute:**
+Meaning instead of writing XML or Groovy/DSL, your build file is Java code too.
+**To build your project, [download/copy the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) into your project, open a terminal and execute:**
 
 - Java 11 and above: `java JPM.java`
 - Java 8 to 10:  `javac JPM.java && java -cp . JPM`
@@ -12,7 +12,10 @@ Meaning instead of writing XML (Maven) or Groovy/DSL (Gradle), your build file i
 [globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk) (not JRE)
 with JAVA_HOME set
 
-**You can also clone/download this repository since it functions as a template too.**
+Good to know:
+- This repository functions as a template too
+- 1JPM is Maven based, thus great IDE support by default
+- 1JPM includes some extra plugins to increase runtime safety and provide additional features out of the box
 
 Below you can see the example configuration which runs the `clean package` tasks.
 This compiles and creates a jar file from your code, and additionally creates the sources,
