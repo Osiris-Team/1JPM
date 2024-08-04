@@ -69,7 +69,7 @@ public class JPM {
 ```
 
 Note that 1JPM is now using **Maven under the hood**, since the complexity as a fully independent build tool
-(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. 1JPM will take care of generating the pom.xml, downloading the Maven-Wrapper, and then executing Maven as you can see in `main()`.
+(see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. 1JPM will take care of generating the pom.xml, downloading the Maven-Wrapper, and then executing Maven as you can see above`.
 
 A 1JPM plugin is basically a wrapper around a Maven plugin (its xml), providing easy access to its features, but can also be anything else to make building easier.
 These third-party plugins can be added simply by appending their Java code inside the ThirdPartyPlugins class.
