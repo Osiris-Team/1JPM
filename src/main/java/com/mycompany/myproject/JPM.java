@@ -9,6 +9,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -60,7 +61,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.0.3 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.0.4 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // To upgrade JPM, replace everything below with its newer version
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
@@ -153,17 +154,92 @@ public class JPM {
     }
 
     public static class Dependency {
-        public static Dependency fromGradleString(String s){
+
+        public static Dependency fromGradleString(Project project, String s) {
             String[] split = s.split(":");
             String groupId = split.length >= 1 ? split[0] : "";
             String artifactId = split.length >= 2 ? split[1] : "";
             String versionId = split.length >= 3 ? split[2] : "";
             String scope = split.length >= 4 ? split[3] : "compile";
-            Dependency dep = new Dependency(groupId, artifactId, versionId, scope);
-            if(split.length < 3) System.err.println("No version provided. This might cause issues. Dependency: "+s);
+            Dependency dep = new Dependency(project, groupId, artifactId, versionId, scope);
+
+            if (split.length < 3) {
+                System.err.println("No version provided. This might cause issues. Dependency: " + s);
+                suggestVersions(project, groupId, artifactId);
+            }
+
             return dep;
         }
 
+        private static void suggestVersions(Project project, String groupId, String artifactId) {
+            Map<String, String> latestVersions = new HashMap<>();
+
+            for (Repository _repo : project.repositories) {
+                String repo = _repo.url;
+                try {
+                    URL url = new URL(repo + "/" + groupId.replace('.', '/') + "/" + artifactId + "/maven-metadata.xml");
+                    System.out.println("Checking repository: " + url);
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("GET");
+
+                    if (connection.getResponseCode() == 200) {
+                        List<String> versions = new ArrayList<>();
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (line.contains("<version>")) {
+                                    String version = line.trim().replace("<version>", "").replace("</version>", "");
+                                    versions.add(version);
+                                }
+                            }
+                        }
+
+                        if (!versions.isEmpty()) {
+                            Collections.sort(versions, new VersionComparator());
+                            latestVersions.put(repo, versions.get(0));
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error checking repository " + repo + ": " + e.getMessage());
+                }
+            }
+
+            if (!latestVersions.isEmpty()) {
+                System.out.println("Latest versions for " + groupId + ":" + artifactId + " across repositories:");
+                for (Map.Entry<String, String> entry : latestVersions.entrySet()) {
+                    System.out.println("  - " + entry.getKey() + ": " + entry.getValue() +
+                            (entry.getValue().contains("SNAPSHOT") ? " (SNAPSHOT)" : ""));
+                }
+            } else {
+                System.out.println("No versions found for " + groupId + ":" + artifactId + " in any repository");
+            }
+        }
+
+        private static class VersionComparator implements Comparator<String> {
+            @Override
+            public int compare(String v1, String v2) {
+                String[] parts1 = v1.split("\\.");
+                String[] parts2 = v2.split("\\.");
+                for (int i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+                    int p1 = i < parts1.length ? parseVersionPart(parts1[i]) : 0;
+                    int p2 = i < parts2.length ? parseVersionPart(parts2[i]) : 0;
+                    if (p1 != p2) {
+                        return Integer.compare(p2, p1);  // Reverse order for latest version first
+                    }
+                }
+                return v2.compareTo(v1);  // Reverse order for latest version first
+            }
+
+            private int parseVersionPart(String part) {
+                try {
+                    return Integer.parseInt(part);
+                } catch (NumberFormatException e) {
+                    return 0;
+                }
+            }
+        }
+
+        public Project project;
         public String groupId;
         public String artifactId;
         public String version;
@@ -172,15 +248,16 @@ public class JPM {
         public List<Dependency> excludedDependencies = new ArrayList<>();
         public String type = "";
 
-        public Dependency(String groupId, String artifactId, String version) {
-            this(groupId, artifactId, version, "compile", new ArrayList<>());
+        public Dependency(Project project, String groupId, String artifactId, String version) {
+            this(project, groupId, artifactId, version, "compile", new ArrayList<>());
         }
 
-        public Dependency(String groupId, String artifactId, String version, String scope) {
-            this(groupId, artifactId, version, scope, new ArrayList<>());
+        public Dependency(Project project, String groupId, String artifactId, String version, String scope) {
+            this(project, groupId, artifactId, version, scope, new ArrayList<>());
         }
 
-        public Dependency(String groupId, String artifactId, String version, String scope, List<Dependency> transitiveDependencies) {
+        public Dependency(Project project, String groupId, String artifactId, String version, String scope, List<Dependency> transitiveDependencies) {
+            this.project = project;
             this.groupId = groupId;
             this.artifactId = artifactId;
             this.version = version;
@@ -189,7 +266,7 @@ public class JPM {
         }
 
         public Dependency exclude(String s){
-            return exclude(Dependency.fromGradleString(s));
+            return exclude(Dependency.fromGradleString(project, s));
         }
 
         public Dependency exclude(Dependency dep){
@@ -606,6 +683,10 @@ public class JPM {
         public List<String> compilerArgs = new ArrayList<>();
         public List<Project> profiles = new ArrayList<>();
 
+        public Project() {
+            repositories.add(Repository.fromUrl("https://repo.maven.apache.org/maven2"));
+        }
+
         public Repository addRepository(String url, boolean isSnapshotsAllowed){
             Repository repository = addRepository(url);
             repository.isSnapshotsAllowed = isSnapshotsAllowed;
@@ -619,17 +700,17 @@ public class JPM {
         }
 
         public Dependency testImplementation(String s){
-            Dependency dep = addDependency(Dependency.fromGradleString(s));
+            Dependency dep = addDependency(Dependency.fromGradleString(this, s));
             dep.scope = "test";
             return dep;
         }
 
         public Dependency implementation(String s){
-            return addDependency(Dependency.fromGradleString(s));
+            return addDependency(Dependency.fromGradleString(this, s));
         }
 
         public Dependency addDependency(String groupId, String artifactId, String version) {
-            Dependency dep = new Dependency(groupId, artifactId, version);
+            Dependency dep = new Dependency(this, groupId, artifactId, version);
             return addDependency(dep);
         }
 
@@ -639,11 +720,11 @@ public class JPM {
         }
 
         public Dependency forceImplementation(String s){
-            return forceDependency(Dependency.fromGradleString(s));
+            return forceDependency(Dependency.fromGradleString(this, s));
         }
 
         public Dependency forceDependency(String groupId, String artifactId, String version) {
-            Dependency dep = new Dependency(groupId, artifactId, version);
+            Dependency dep = new Dependency(this, groupId, artifactId, version);
             return forceDependency(dep);
         }
 
@@ -661,7 +742,7 @@ public class JPM {
          * @param onBeforeToXML executed before the xml for this plugin is generated, provides context details in parameter.
          */
         public Plugin putPlugin(String s, Consumer<Plugin.Details> onBeforeToXML){
-            Dependency dep = Dependency.fromGradleString(s);
+            Dependency dep = Dependency.fromGradleString(this, s);
             Plugin pl = new Plugin(dep.groupId, dep.artifactId, dep.version);
             this.plugins.removeIf(pl2 -> pl2.groupId.equals(pl.groupId) && pl2.artifactId.equals(pl.artifactId));
             pl.onBeforeToXML(onBeforeToXML);
