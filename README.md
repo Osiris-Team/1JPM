@@ -56,7 +56,8 @@ public class JPM {
             if(args != null){
                 generatePom();
                 if(!args.contains("skipMaven"))
-                    JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"  
+                    JPM.executeMaven("clean", "package");//, "-DskipTests"); 
+                // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
             }
         }
     }

@@ -51,7 +51,8 @@ public class JPM {
             if(args != null){
                 generatePom();
                 if(!args.contains("skipMaven"))
-                    JPM.executeMaven("clean", "package"); // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+                    JPM.executeMaven("clean", "package");//, "-DskipTests");
+                // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
             }
         }
     }
@@ -77,6 +78,10 @@ public class JPM {
 
     public static void main(String[] args) throws Exception {
         new ThisProject(new ArrayList<>(Arrays.asList(args)));
+    }
+
+    public static void executeMaven(List<String> args) throws IOException, InterruptedException {
+        executeMaven(args.toArray(new String[0]));
     }
 
     public static void executeMaven(String... args) throws IOException, InterruptedException {
