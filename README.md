@@ -103,6 +103,47 @@ Now `project.isAutoParentsAndChildren` will work properly, since all needed pom.
 
 </details>
 
+#### 1JPM can create native executables
+<details>
+<summary></summary>
+
+GraalVM must be installed, then simply add `JPM.plugins.add(NativeImagePlugin.get);` before building.
+
+The `NativeImagePlugin` in 1JPM is designed to integrate GraalVM's native image building capabilities into your Java project with minimal configuration. By default, it does the following:
+
+1. **Image Generation**: It builds a native executable from your Java application using GraalVM. The generated executable is placed in the `target` directory.
+
+2. **Default Configuration**:
+    - **`imageName`**: Defaults to the project's `artifactId`.
+    - **`mainClass`**: Automatically determined from the project’s main class configuration.
+    - **`build-native` execution**: Compiles the project into a native image during the `package` phase.
+    - **`test-native` execution**: Compiles and runs tests as native images during the `test` phase.
+
+3. **Basic Options**: The plugin can be further configured with options like `verbose` output, additional `buildArgs`, or enabling debug information, but these are not set by default.
+
+This setup allows you to seamlessly build native executables with GraalVM, leveraging its performance benefits and ahead-of-time (AOT) compilation, directly from your Maven build process.
+
+For more details see [this GraalVM article](https://graalvm.github.io/native-build-tools/latest/maven-plugin.html).
+
+</details>
+
+#### 1JPM can create native installers
+<details>
+<summary></summary>
+
+Simply add `JPM.plugins.add(PackagerPlugin.get);` before building.
+With the default configuration, the `PackagerPlugin` in 1JPM:
+
+- **Bundles a JRE** with the application package, ensuring the packaged application is self-contained and can run on any system without requiring an external JRE.
+- **Uses the project's main class** as the entry point for the application, which is automatically set based on the project's configuration.
+- **Generates a basic executable package** without additional platform-specific settings, tarballs, or zipballs.
+- **Creates an installer** for the application by default for the current operating system.
+
+This default setup is ideal for quickly packaging a Java application into a distributable format that includes everything needed to run the app.
+For more details see [JavaPackager on GitHub](https://github.com/fvarrui/JavaPackager).
+
+</details>
+
 #### 1JPM is Maven based
 <details>
 <summary></summary>

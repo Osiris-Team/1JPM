@@ -66,7 +66,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.1.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // To upgrade JPM, replace everything below with its newer version
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
@@ -1270,6 +1270,484 @@ public class JPM {
                         .addGoal("enforce")
                         .putConfiguration("rules dependencyConvergence", "");
             });
+        }
+    }
+
+    static {
+        // This is opt-in meaning user must add it to the plugins, like shown below
+        //plugins.add(PackagerPlugin.get);
+    }
+    /**
+     * A plugin class for integrating JavaPackager into the 1JPM build system.
+     * This class allows for configuration of the JavaPackager Maven plugin
+     * through public fields and methods. It simplifies the setup by using
+     * project defaults where applicable.
+     */
+    public static class PackagerPlugin extends Plugin {
+        public static PackagerPlugin get = new PackagerPlugin();
+
+        /**
+         * The main class of the application to be packaged.
+         * If not set, it defaults to the project's main class.
+         */
+        public String mainClass;
+
+        /**
+         * Indicates whether to bundle a JRE with the application.
+         * Defaults to true, so that the user must not install Java separately.
+         */
+        public boolean bundleJre = true;
+
+        /**
+         * Generates a customized JRE, including only identified or specified modules. Otherwise, all modules will be included.
+         * Defaults to true.
+         */
+        public boolean customizedJre = true;
+
+        /**
+         * The path to the JRE to be bundled with the application.
+         * This is required if bundling with an existing JRE.
+         */
+        public String jrePath;
+
+        /**
+         * Path to a custom runnable JAR to be used instead of generating a new one.
+         */
+        public String runnableJar;
+
+        /**
+         * The target platform for the package (e.g., "windows", "linux", "mac").
+         */
+        public String platform;
+
+        /**
+         * Indicates whether to create a zip archive for the package.
+         * Defaults to false.
+         */
+        public boolean createZipball = false;
+
+        /**
+         * Indicates whether to create a tarball archive for the package.
+         * Defaults to false.
+         */
+        public boolean createTarball = false;
+
+        /**
+         * Indicates whether to generate an installer for the package.
+         * Defaults to true.
+         */
+        public boolean generateInstaller = true;
+
+        /**
+         * The name of the package. If not set, it defaults to the project's artifact ID.
+         */
+        public String name;
+
+        /**
+         * Constructor for the PackagerPlugin class.
+         * Sets up the plugin with its group ID, artifact ID, and version.
+         * Automatically configures plugin options using project defaults where available.
+         */
+        public PackagerPlugin() {
+            super("io.github.fvarrui", "javapackager", "latest-version-here");
+            onBeforeToXML(d -> {
+                // Use project defaults where applicable
+                if (mainClass != null && !mainClass.isEmpty()) {
+                    d.putConfiguration("mainClass", mainClass);
+                } else if (d.project.mainClass != null && !d.project.mainClass.isEmpty()) {
+                    d.putConfiguration("mainClass", d.project.mainClass);
+                }
+
+                if (bundleJre) {
+                    d.putConfiguration("bundleJre", "true");
+                }
+
+                if (!customizedJre) {
+                    d.putConfiguration("customizedJre", "false");
+                }
+
+                if (jrePath != null && !jrePath.isEmpty()) {
+                    d.putConfiguration("jrePath", jrePath);
+                }
+
+                if (runnableJar != null && !runnableJar.isEmpty()) {
+                    d.putConfiguration("runnableJar", runnableJar);
+                }
+
+                if (platform != null && !platform.isEmpty()) {
+                    d.putConfiguration("platform", platform);
+                }
+
+                if (createZipball) {
+                    d.putConfiguration("createZipball", "true");
+                }
+
+                if (createTarball) {
+                    d.putConfiguration("createTarball", "true");
+                }
+
+                if (!generateInstaller) {
+                    d.putConfiguration("generateInstaller", "false");
+                }
+
+                if (name != null && !name.isEmpty()) {
+                    d.putConfiguration("name", name);
+                } else if (d.project.artifactId != null && !d.project.artifactId.isEmpty()) {
+                    d.putConfiguration("name", d.project.artifactId);
+                }
+            });
+        }
+
+        /**
+         * Adds a custom execution to the plugin.
+         *
+         * @param id The ID of the execution.
+         * @param phase The phase of the build lifecycle to attach the execution to (e.g., "package").
+         * @param executionConfig A Consumer function to configure the execution's goals and additional settings.
+         * @return The current PackagerPlugin instance for chaining.
+         */
+        public PackagerPlugin addExecution(String id, String phase, Consumer<Execution> executionConfig) {
+            Execution execution = new Execution(id, phase);
+            executionConfig.accept(execution);
+            this.onBeforeToXML(d -> d.addExecution(execution));
+            return this;
+        }
+
+        /**
+         * Adds multiple executions to the plugin, typically for creating packages
+         * for different platforms (Windows, Linux, Mac).
+         *
+         * @return The current PackagerPlugin instance for chaining.
+         */
+        public PackagerPlugin addMultipleExecutions() {
+            // Bundling for Windows
+            addExecution("bundling-for-windows", "package", e -> {
+                e.addGoal("package");
+                e.putConfiguration("platform", "windows");
+                e.putConfiguration("createZipball", "true");
+            });
+
+            // Bundling for Linux
+            addExecution("bundling-for-linux", "package", e -> {
+                e.addGoal("package");
+                e.putConfiguration("platform", "linux");
+                e.putConfiguration("createTarball", "true");
+                if (jrePath != null && !jrePath.isEmpty()) {
+                    e.putConfiguration("jdkPath", jrePath);
+                }
+            });
+
+            // Bundling for Mac
+            addExecution("bundling-for-mac", "package", e -> {
+                e.addGoal("package");
+                e.putConfiguration("platform", "mac");
+                e.putConfiguration("createTarball", "true");
+                if (jrePath != null && !jrePath.isEmpty()) {
+                    e.putConfiguration("jdkPath", jrePath);
+                }
+            });
+
+            return this;
+        }
+    }
+
+    static {
+        // This is opt-in meaning user must add it to the plugins, like shown below
+        //plugins.add(NativeImagePlugin.get);
+    }
+    /**
+     * This class integrates the GraalVM Native Image Maven plugin with 1JPM.
+     * It provides fields to configure common options for building native images.
+     * <p>
+     * This plugin allows you to compile your Java application into a native executable
+     * using GraalVM's native-image tool. It is highly configurable and supports various
+     * advanced features such as building shared libraries, enabling debugging information,
+     * and integrating with a metadata repository.
+     * </p>
+     */
+    public static class NativeImagePlugin extends JPM.Plugin {
+
+        /**
+         * The name of the generated native image. Defaults to the artifactId of the project.
+         */
+        public String imageName;
+
+        /**
+         * The main class of the application. Defaults to the project's main class.
+         */
+        public String mainClass;
+
+        /**
+         * Whether to skip the native image build. Defaults to false.
+         */
+        public boolean skipNativeBuild = false;
+
+        /**
+         * Whether to skip native image tests. Defaults to false.
+         */
+        public boolean skipNativeTests = false;
+
+        /**
+         * Whether to enable debugging information in the native image. Defaults to false.
+         */
+        public boolean debug = false;
+
+        /**
+         * Whether to enable verbose output during the native image build. Defaults to false.
+         */
+        public boolean verbose = false;
+
+        /**
+         * Whether to build the native image as a shared library. Defaults to false.
+         */
+        public boolean sharedLibrary = false;
+
+        /**
+         * Whether to use an argument file for passing arguments to the native-image tool. Defaults to false.
+         */
+        public boolean useArgFile = false;
+
+        /**
+         * Whether to enable quick build mode. Defaults to false.
+         */
+        public boolean quickBuild = false;
+
+        /**
+         * A map of environment variables to be passed to the native-image tool.
+         */
+        public Map<String, String> environment = new HashMap<>();
+
+        /**
+         * A map of system properties to be passed to the native-image tool.
+         */
+        public Map<String, String> systemPropertyVariables = new HashMap<>();
+
+        /**
+         * A list of additional arguments to pass to the native-image tool.
+         */
+        public List<String> buildArgs = new ArrayList<>();
+
+        /**
+         * A list of JVM arguments to pass during the native-image build.
+         */
+        public List<String> jvmArgs = new ArrayList<>();
+
+        /**
+         * A list of directories where configuration files for native-image should be looked up.
+         */
+        public List<String> configurationFileDirectories = new ArrayList<>();
+
+        /**
+         * A custom classpath for the native image build.
+         */
+        public List<String> classpath = new ArrayList<>();
+
+        /**
+         * The directory containing the application's classes.
+         */
+        public String classesDirectory;
+
+        /**
+         * Configuration for the GraalVM native agent.
+         */
+        public GraalAgentConfig agentConfig;
+
+        /**
+         * Configuration for the GraalVM metadata repository.
+         */
+        public GraalMetadataRepositoryConfig metadataRepositoryConfig;
+
+        public NativeImagePlugin() {
+            super("org.graalvm.buildtools", "native-maven-plugin", "0.10.2");
+            onBeforeToXML(d -> {
+                // Use sensible defaults if not provided
+                if (imageName == null) {
+                    imageName = d.project.artifactId;  // Default to project's artifactId
+                }
+                if (mainClass == null) {
+                    mainClass = d.project.mainClass;  // Default to project's mainClass
+                }
+
+                d.putConfiguration("imageName", imageName);
+                d.putConfiguration("mainClass", mainClass);
+
+                if (skipNativeBuild) d.putConfiguration("skipNativeBuild", "true");
+                if (skipNativeTests) d.putConfiguration("skipNativeTests", "true");
+                if (debug) d.putConfiguration("debug", "true");
+                if (verbose) d.putConfiguration("verbose", "true");
+                if (sharedLibrary) d.putConfiguration("sharedLibrary", "true");
+                if (useArgFile) d.putConfiguration("useArgFile", "true");
+                if (quickBuild) d.putConfiguration("quickBuild", "true");
+
+                if (!environment.isEmpty()) {
+                    XML envXml = new XML("environment");
+                    for (Map.Entry<String, String> entry : environment.entrySet()) {
+                        envXml.put(entry.getKey(), entry.getValue());
+                    }
+                    d.xml.add("configuration", envXml);
+                }
+
+                if (!systemPropertyVariables.isEmpty()) {
+                    XML sysPropXml = new XML("systemPropertyVariables");
+                    for (Map.Entry<String, String> entry : systemPropertyVariables.entrySet()) {
+                        sysPropXml.put(entry.getKey(), entry.getValue());
+                    }
+                    d.xml.add("configuration", sysPropXml);
+                }
+
+                if (!buildArgs.isEmpty()) {
+                    XML buildArgsXml = new XML("buildArgs");
+                    for (String arg : buildArgs) {
+                        buildArgsXml.put("buildArg", arg);
+                    }
+                    d.xml.add("configuration", buildArgsXml);
+                }
+
+                if (!jvmArgs.isEmpty()) {
+                    XML jvmArgsXml = new XML("jvmArgs");
+                    for (String arg : jvmArgs) {
+                        jvmArgsXml.put("arg", arg);
+                    }
+                    d.xml.add("configuration", jvmArgsXml);
+                }
+
+                if (!configurationFileDirectories.isEmpty()) {
+                    XML configDirsXml = new XML("configurationFileDirectories");
+                    for (String dir : configurationFileDirectories) {
+                        configDirsXml.put("dir", dir);
+                    }
+                    d.xml.add("configuration", configDirsXml);
+                }
+
+                if (!classpath.isEmpty()) {
+                    XML classpathXml = new XML("classpath");
+                    for (String cp : classpath) {
+                        classpathXml.put("param", cp);
+                    }
+                    d.xml.add("configuration", classpathXml);
+                }
+
+                if (classesDirectory != null) {
+                    d.putConfiguration("classesDirectory", classesDirectory);
+                }
+
+                if (agentConfig != null) {
+                    d.xml.add("configuration agent", agentConfig.toXML());
+                }
+
+                if (metadataRepositoryConfig != null) {
+                    d.xml.add("configuration metadataRepository", metadataRepositoryConfig.toXML());
+                }
+            });
+        }
+    }
+
+
+    /**
+     * Configuration class for the GraalVM native agent.
+     */
+    public static class GraalAgentConfig {
+        public boolean enabled = false;
+        public String defaultMode;
+        public Map<String, String> options = new HashMap<>();
+        public Map<String, String> modes = new HashMap<>();
+        public GraalMetadataCopyConfig metadataCopy;
+
+        public XML toXML() {
+            XML xml = new XML("agent");
+            xml.put("enabled", String.valueOf(enabled));
+            if (defaultMode != null) xml.put("defaultMode", defaultMode);
+
+            if (!modes.isEmpty()) {
+                for (Map.Entry<String, String> entry : modes.entrySet()) {
+                    xml.put("modes " + entry.getKey(), entry.getValue());
+                }
+            }
+
+            if (!options.isEmpty()) {
+                for (Map.Entry<String, String> entry : options.entrySet()) {
+                    xml.put("options " + entry.getKey(), entry.getValue());
+                }
+            }
+
+            if (metadataCopy != null) {
+                xml.add("metadataCopy", metadataCopy.toXML());
+            }
+
+            return xml;
+        }
+    }
+
+    /**
+     * Configuration class for handling the metadata copy process after the native agent execution.
+     */
+    public static class GraalMetadataCopyConfig {
+        public boolean merge = false;
+        public String outputDirectory;
+        public Set<String> disabledStages = new HashSet<>();
+
+        public XML toXML() {
+            XML xml = new XML("metadataCopy");
+            xml.put("merge", String.valueOf(merge));
+            if (outputDirectory != null) xml.put("outputDirectory", outputDirectory);
+
+            if (!disabledStages.isEmpty()) {
+                XML stagesXml = new XML("disabledStages");
+                for (String stage : disabledStages) {
+                    stagesXml.put("stage", stage);
+                }
+                xml.add(stagesXml);
+            }
+
+            return xml;
+        }
+    }
+
+    /**
+     * Configuration class for managing the GraalVM metadata repository.
+     */
+    public static class GraalMetadataRepositoryConfig {
+        public boolean enabled = true;
+        public String localPath;
+        public String url;
+        public String version;
+        public Map<String, GraalDependencyConfig> dependencies = new HashMap<>();
+
+        public XML toXML() {
+            XML xml = new XML("metadataRepository");
+            xml.put("enabled", String.valueOf(enabled));
+            if (localPath != null) xml.put("localPath", localPath);
+            if (url != null) xml.put("url", url);
+            if (version != null) xml.put("version", version);
+
+            if (!dependencies.isEmpty()) {
+                XML depsXml = new XML("dependencies");
+                for (Map.Entry<String, GraalDependencyConfig> entry : dependencies.entrySet()) {
+                    depsXml.add(entry.getValue().toXML());
+                }
+                xml.add(depsXml);
+            }
+
+            return xml;
+        }
+    }
+
+    /**
+     * Represents configuration for a specific dependency in the metadata repository.
+     */
+    public static class GraalDependencyConfig {
+        public String groupId;
+        public String artifactId;
+        public boolean excluded = false;
+        public String metadataVersion;
+
+        public XML toXML() {
+            XML xml = new XML("dependency");
+            xml.put("groupId", groupId);
+            xml.put("artifactId", artifactId);
+            if (excluded) xml.put("excluded", "true");
+            if (metadataVersion != null) xml.put("metadataVersion", metadataVersion);
+            return xml;
         }
     }
 }
