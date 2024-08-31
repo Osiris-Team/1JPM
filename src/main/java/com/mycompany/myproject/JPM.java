@@ -4,6 +4,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -11,25 +12,28 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public class JPM {
     public static class ThisProject extends JPM.Project {
-        public ThisProject() throws IOException, InterruptedException {
+        public ThisProject() throws Exception {
             this(null);
         }
-        public ThisProject(List<String> args) throws IOException, InterruptedException {
+        public ThisProject(List<String> args) throws Exception {
             // Override default configurations
             this.groupId = "com.mycompany.myproject";
             this.artifactId = "my-project";
             this.version = "1.0.0";
-            this.mainClass = "com.mycompany.myproject.MyMainClass";
-            this.jarName = "my-project.jar";
-            this.fatJarName = "my-project-with-dependencies.jar";
+            this.mainClass = groupId+".MyMainClass";
+            this.jarName = artifactId+".jar";
+            this.fatJarName = artifactId+"-with-dependencies.jar";
 
             // If there are duplicate dependencies with different versions force a specific version like so:
             //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
@@ -62,7 +66,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.0.4 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.1.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // To upgrade JPM, replace everything below with its newer version
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
@@ -70,12 +74,23 @@ public class JPM {
     public static final String mavenWrapperScriptUrlBase = "https://raw.githubusercontent.com/apache/maven-wrapper/maven-wrapper-"+ mavenWrapperVersion +"/maven-wrapper-distribution/src/resources/";
     public static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
     public static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
+    public static final String jpmLatestUrl = "https://github.com/Osiris-Team/1JPM/raw/main/src/main/java/com/mycompany/myproject/JPM.java";
+
+    /**
+     * Running {@link #main(String[])} without arguments / empty arguments
+     * should always result in a pom.xml file being created anyway. <br>
+     * Passing over null instead of an arguments list should never create a pom.xml file.
+     */
+    public static Object expectation1 = new Object();
 
     static{
         // Init this once to ensure their plugins are added if they use the static constructor
         new ThirdPartyPlugins();
     }
 
+    /**
+     * Bound by {@link #expectation1}.
+     */
     public static void main(String[] args) throws Exception {
         new ThisProject(new ArrayList<>(Arrays.asList(args)));
     }
@@ -145,6 +160,122 @@ public class JPM {
         try (FileWriter writer = new FileWriter(propertiesFile)) {
             writer.write(mavenWrapperPropsContent);
         }
+    }
+
+    /**
+     * This is going to download and copy the latest JPM.java file into all child projects it can find in this directory,
+     * and also run that file to generate an initial pom.xml. The child projects name will be the same as its root directory name.<br>
+     * <br>
+     * A child project is detected if a src/main/java folder structure exists, and the parent folder of src/ is then used
+     * as child project root. <br>
+     * <br>
+     * Note that a child project is expected to be directly inside a subdirectory of this project.<br>
+     * <br>
+     * Useful to quickly setup existing multi-module projects, since then {@link Project#isAutoParentsAndChildren} will work properly. <br>
+     * <br>
+     * Bound by {@link #expectation1}.
+     */
+    public static void portChildProjects() throws Exception {
+        List<File> childProjectDirs = new ArrayList<>();
+        File cwd = new File(System.getProperty("user.dir"));
+        File[] subDirs = cwd.listFiles(File::isDirectory);
+        if(subDirs != null)
+            for (File subDir : subDirs) {
+                fillSubProjectDirs(subDir, childProjectDirs);
+            }
+
+        if(childProjectDirs.isEmpty()) System.out.println("No child projects found in dir: "+cwd);
+        else {
+            for (File childProjectDir : childProjectDirs) {
+                File jpmFile = new File(childProjectDir, "JPM.java");
+                if(jpmFile.exists()) {
+                    System.out.println("JPM.java file already exists for child project '"+childProjectDir.getName()+"'.");
+                    if(!new File(childProjectDir, "pom.xml").exists()){
+                        execJavaJpmJava(childProjectDir);
+                    }
+                    continue;
+                }
+                System.out.println("Downloading file from: " + jpmLatestUrl);
+                URL url = new URL(jpmLatestUrl);
+                jpmFile.getParentFile().mkdirs();
+                String jpmJavaContent = readUrlContentAsString(url);
+                jpmJavaContent = jpmJavaContent.replace(".myproject", "."+childProjectDir.getName())
+                        .replace("my-project", childProjectDir.getName());
+                Files.write(jpmFile.toPath(), jpmJavaContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                System.out.println("Created JPM.java file for child project '"+childProjectDir.getName()+"'.");
+
+                execJavaJpmJava(childProjectDir);
+            }
+
+            for (File childProjectDir : childProjectDirs) {
+                System.out.println(childProjectDir);
+            }
+            System.out.println("Ported "+childProjectDirs.size()+" child projects successfully!");
+        }
+    }
+
+    private static void execJavaJpmJava(File childProjectDir) throws IOException, InterruptedException {
+        ProcessBuilder p = new ProcessBuilder();
+        p.command("java", "JPM.java");
+        p.inheritIO();
+        p.directory(childProjectDir);
+        System.out.println("Executing in child project '"+ childProjectDir.getName()+"': java JPM.java");
+        Process result = p.start();
+        result.waitFor();
+        if(result.exitValue() != 0){
+            RuntimeException ex = new RuntimeException("Command finished with an error ("+result.exitValue()+"), while executing: java JPM.java");
+            if(new File(childProjectDir, "pom.xml").exists()){
+                System.err.println("IGNORED exception because pom.xml file was created. Make sure to look into this later:");
+                ex.printStackTrace();
+                return;
+            }
+            throw ex;
+        }
+    }
+
+    private static void fillSubProjectDirs(File dir, List<File> childProjectDirs){
+        File javaDir = new File(dir+"/src/main/java");
+        if(javaDir.exists()){
+            childProjectDirs.add(dir);
+            File[] subDirs = dir.listFiles(File::isDirectory);
+            if(subDirs != null)
+                for (File subDir : subDirs) {
+                    fillSubProjectDirs(subDir, childProjectDirs);
+                }
+        }
+    }
+
+    /**
+     * Reads the content of a URL as binary data and converts it to a String.
+     *
+     * @param url The URL to read from.
+     * @param charset The charset to use for converting bytes to a String.
+     * @return The content of the URL as a String.
+     * @throws Exception If an I/O error occurs.
+     */
+    public static String readUrlContentAsString(URL url, Charset charset) throws Exception {
+        try (InputStream inputStream = url.openStream();
+             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+
+            return byteArrayOutputStream.toString(charset.name());
+        }
+    }
+
+    /**
+     * Overloaded method to use UTF-8 as the default charset.
+     *
+     * @param url The URL to read from.
+     * @return The content of the URL as a String.
+     * @throws Exception If an I/O error occurs.
+     */
+    public static String readUrlContentAsString(URL url) throws Exception {
+        return readUrlContentAsString(url, StandardCharsets.UTF_8);
     }
 
     //
@@ -359,6 +490,21 @@ public class JPM {
             }
         }
 
+        public XML(File file){
+            try {
+                DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                DocumentBuilder builder = factory.newDocumentBuilder();
+                document = builder.parse(file);
+                root = document.getDocumentElement();
+            } catch (ParserConfigurationException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (SAXException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         // Method to append another XML object to this XML document's root.
         public XML add(XML otherXML) {
             Node importedNode = document.importNode(otherXML.root, true);
@@ -421,8 +567,7 @@ public class JPM {
         }
 
         public XML remove(String key) {
-            String[] path = key.split(" ");
-            Element element = getElementOrNull(path);
+            Element element = getElementOrNull(key);
             if (element != null && element.getParentNode() != null) {
                 element.getParentNode().removeChild(element);
             }
@@ -430,8 +575,7 @@ public class JPM {
         }
 
         public XML rename(String oldKey, String newName) {
-            String[] path = oldKey.split(" ");
-            Element element = getElementOrNull(path);
+            Element element = getElementOrNull(oldKey);
             if (element != null) {
                 document.renameNode(element, null, newName);
             }
@@ -439,7 +583,7 @@ public class JPM {
         }
 
         // Helper method to traverse or create elements based on a path.
-        private Element getElementOrCreate(String key) {
+        public Element getElementOrCreate(String key) {
             if (key == null || key.trim().isEmpty()) return root;
             String[] path = key.split(" ");
             Element currentElement = root;
@@ -465,7 +609,13 @@ public class JPM {
             return currentElement;
         }
 
-        private Element getElementOrNull(String[] path) {
+        public Element getElementOrNull(String key) {
+            if (key == null || key.trim().isEmpty()) return root;
+            String[] path = key.split(" ");
+            return getElementOrNull(path);
+        }
+
+        protected Element getElementOrNull(String[] path) {
             Element currentElement = root;
             for (String nodeName : path) {
                 NodeList children = currentElement.getChildNodes();
@@ -503,6 +653,14 @@ public class JPM {
                 e.printStackTrace();
             }
             return null;
+        }
+
+        public String toStringAt(File file) throws IOException {
+            String s = toString();
+            try (FileWriter writer = new FileWriter(file)) {
+                writer.write(s);
+            }
+            return s;
         }
 
         public static void main(String[] args) {
@@ -687,6 +845,14 @@ public class JPM {
         public List<Plugin> plugins = JPM.plugins;
         public List<String> compilerArgs = new ArrayList<>();
         public List<Project> profiles = new ArrayList<>();
+        /**
+         * If true updates current pom, all parent and all child pom.xml
+         * files with the respective parent details. <br>
+         * <br>
+         * This expects that the parent pom is always inside the parent directory,
+         * otherwise a performant search is not possible since the entire disk would need to be checked.
+         */
+        public boolean isAutoParentsAndChildren = true;
 
         public Project() {
             repositories.add(Repository.fromUrl("https://repo.maven.apache.org/maven2"));
@@ -838,6 +1004,134 @@ public class JPM {
                 writer.write(pom.toString());
             }
             System.out.println("Generated pom.xml file.");
+
+            // If isAutoParentsAndChildren is true, handle parents and children automatically
+            if (isAutoParentsAndChildren) {
+                updateParentsPoms(pom);
+                updateChildrenPoms();
+            }
+        }
+
+        protected void updateParentsPoms(XML currentPom) throws IOException {
+            updateParentsPoms(currentPom, new File(System.getProperty("user.dir")), null);
+        }
+
+        protected void updateParentsPoms(XML currentPom, File currentDir, File forceStopAtDir) throws IOException {
+            if(currentDir == null){
+                System.out.println("Force end probably at disk root, because currentDir is null.");
+                return;
+            }
+            File parentDir = currentDir.getParentFile();
+            File parentPom = null;
+
+            while (parentDir != null) {
+                if(forceStopAtDir != null && forceStopAtDir.equals(currentDir)) {
+                    System.out.println("Force end at: " + parentPom);
+                    return;
+                }
+
+                parentPom = new File(parentDir, "pom.xml");
+                if (parentPom.exists()) {
+                    // Load and update parent pom.xml
+                    System.out.println("Subproject '"+currentDir.getName()+"', found parent pom.xml at: " + parentPom.getAbsolutePath());
+                    XML parent = new XML(parentPom);
+                    Element parentGroup = parent.getElementOrNull("groupId");
+                    Element parentArtifactId = parent.getElementOrNull("artifactId");
+                    Element parentVersion = parent.getElementOrNull("version");
+                    String parentPomRelativePath = "../pom.xml";
+                    if(parentGroup == null) {
+                        System.err.println("Ensure that this parent pom.xml contains a groupId! Cannot proceed!");
+                        return;
+                    }
+                    if(parentArtifactId == null) {
+                        System.err.println("Ensure that this parent pom.xml contains a artifactId! Cannot proceed!");
+                        return;
+                    }
+                    if(parentVersion == null) {
+                        System.err.println("Ensure that this parent pom.xml contains a version! Cannot proceed!");
+                        return;
+                    }
+                    currentPom.put("parent groupId", parentGroup.getTextContent());
+                    currentPom.put("parent artifactId", parentArtifactId.getTextContent());
+                    currentPom.put("parent version", parentVersion.getTextContent());
+                    currentPom.put("parent relativePath", parentPomRelativePath);
+                    currentPom.toStringAt(new File(currentDir, "pom.xml"));
+                    System.out.println("Updated pom.xml at: " + currentDir.getName());
+                    currentPom = parent;
+                    currentDir = parentPom;
+                } else{
+                    System.out.println("No more parents found. End at: " + parentPom.getAbsolutePath());
+                    break;
+                }
+                parentDir = parentDir.getParentFile();
+            }
+        }
+
+        protected void updateChildrenPoms() throws IOException {
+            File currentDir = new File(System.getProperty("user.dir"));
+            updateChildrenPoms(currentDir);
+        }
+
+        /**
+         * @param currentDir assume that this contains a pom.xml file that already was updated,
+         *                  now we want to check its sub-dirs for child projects.
+         */
+        protected void updateChildrenPoms(File currentDir) throws IOException {
+            List<File> poms = new ArrayList<>();
+            File[] subDirs = currentDir.listFiles(File::isDirectory);
+            if(subDirs != null)
+                for (File subDir : subDirs) {
+                    fillChildPoms(subDir, poms);
+                }
+
+            // Inline sorting by file depth using separator counting
+            // Sorting is done in descending order of depth (deepest first)
+            poms.sort((f1, f2) -> {
+                int depth1 = f1.getAbsolutePath().split(File.separator.equals("\\") ? "\\\\" : File.separator).length;
+                int depth2 = f2.getAbsolutePath().split(File.separator.equals("\\") ? "\\\\" : File.separator).length;
+                return Integer.compare(depth2, depth1);
+            });
+
+
+            HashSet<File> visitedFolders = new HashSet<>();
+            for (File childPom : poms) {
+                if(visitedFolders.contains(childPom.getParentFile()))
+                    continue;
+
+                // We either force stop at currentDir or at the already visited folder up in the file tree
+                File forceStopAtDir = childPom;
+                while (!visitedFolders.contains(forceStopAtDir)){
+                    forceStopAtDir = forceStopAtDir.getParentFile();
+                    if(forceStopAtDir == null){
+                        forceStopAtDir = currentDir;
+                        break;
+                    }
+                }
+
+                // Update current child pom and all parent poms.
+                XML pom = new XML(childPom);
+                updateParentsPoms(pom, childPom.getParentFile(), forceStopAtDir);
+
+                // Update visited list
+                File folder = childPom.getParentFile();
+                while (folder != null){
+                    visitedFolders.add(folder);
+                    folder = folder.getParentFile();
+                }
+
+            }
+        }
+
+        protected void fillChildPoms(File dir, List<File> poms){
+            File pom = new File(dir, "pom.xml");
+            if(pom.exists()){
+                poms.add(pom);
+                File[] subDirs = dir.listFiles(File::isDirectory);
+                if(subDirs != null)
+                    for (File subDir : subDirs) {
+                        fillChildPoms(subDir, poms);
+                    }
+            }
         }
     }
 

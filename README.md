@@ -72,15 +72,39 @@ public class JPM {
 }
 ```
 
+### Additional goodies
+
+#### 1JPM automatically resolves parent and child projects
+See `project.isAutoParentsAndChildren`.
+If true updates current pom, all parent and all child pom.xml
+files with the respective parent details, adding seamless multi-module/project support.
+
+This expects that the parent pom is always inside the parent directory,
+otherwise a performant search is not possible since the entire disk would need to be checked.
+
+#### 1JPM helps porting your multi-module project
+Add JPM.java to your root project directory and add `JPM.portChildProjects();` before building.
+This is going to download and copy the latest JPM.java file into all child projects it can find
+in this directory, and also run it to generate an initial pom.xml for that child project.
+The child projects name will be the same as its directory name. 
+
+A child project is detected
+if a src/main/java folder structure exists, and the parent folder of src/ is then used as child project root.  
+Note that a child project is expected to be directly inside a subdirectory of this project.
+
+Now `project.isAutoParentsAndChildren` will work properly, since all needed pom.xml files should exist.
+
+#### 1JPM is Maven based
 Note that 1JPM is now using **Maven under the hood**, since the complexity as a fully independent build tool
 (see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. 1JPM will take care of generating the pom.xml, downloading the Maven-Wrapper, and then executing Maven as you can see above`.
 
+#### 1JPM has plugins
 A 1JPM plugin is basically a wrapper around a Maven plugin (its xml), providing easy access to its features, but can also be anything else to make building easier.
 These third-party plugins can be added simply by appending their Java code inside the ThirdPartyPlugins class.
 You can find a list here at [#1jpm-plugin](https://github.com/topics/1jpm-plugin?o=desc&s=updated).
 (these must be written in Java 8 and not use external dependencies).
 
-## 1JPM in Production
+#### 1JPM saves you time
 How many lines of relevant build code do we save compared to Maven?
 - 1JPM: 128 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/src/main/java/JPM.java))
 - Maven: 391 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/pom.xml))
