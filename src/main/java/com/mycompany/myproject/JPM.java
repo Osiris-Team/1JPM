@@ -69,7 +69,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.2.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // To upgrade JPM, replace everything below with its newer version
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
