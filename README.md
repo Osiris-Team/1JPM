@@ -1,25 +1,25 @@
 # 1JPM
 1 Java Project Manager (1JPM), is a Maven/Gradle alternative with a twist.
 It's a single Java file itself, which should be edited by you to configure your project.
-
 Meaning instead of writing XML or Groovy/DSL, your build file is Java code too.
-**To build your project, [download/copy the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) into your project, open a terminal and execute:**
 
-- Java 11 and above: `java JPM.java`
-- Java 8 to 10:  `javac JPM.java && java -cp . JPM`
+**To build your project, simply [drag-and-drop the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) 
+into your project, open a terminal and execute `java JPM.java` (Java 11 and above).**
+
+<details>
+<summary>Java 8 to 10 and JDK notes</summary>
+
+- Execute:  `javac JPM.java && java -cp . JPM`
 - Earlier Java versions are not supported
-- Make sure you use a
-[globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk) (not JRE)
-with JAVA_HOME set
+- Make sure you use a [globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk)
+(not JRE) with JAVA_HOME set
+</details>
+
 
 Good to know:
 - This repository functions as a template too
 - 1JPM is Maven based, thus great IDE support by default
 - 1JPM includes some extra plugins to increase runtime safety and provide additional features out of the box
-
-Below you can see the example configuration which runs the `clean package` tasks.
-This compiles and creates a jar file from your code, and additionally creates the sources,
-javadoc and with-dependencies jars.
 
 ```java
 public class JPM {
@@ -71,6 +71,10 @@ public class JPM {
     // To upgrade JPM, replace everything below with its newer version
 }
 ```
+
+Above you can see the example configuration which runs the `clean package` tasks.
+This compiles and creates a jar file from your code, and additionally creates the sources,
+javadoc and with-dependencies jars.
 
 ### Additional goodies
 
@@ -178,6 +182,8 @@ How many lines of relevant build code do we save compared to Maven?
 
 Thus we write the same config with **263 lines less** code (which is a **3x** saving) when using 1JPM!
 </details>
+
+#### 1JPM is able to auto-update itself
 
 
 ## Why a single file?

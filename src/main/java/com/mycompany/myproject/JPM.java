@@ -11,6 +11,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -70,7 +72,8 @@ public class JPM {
     }
 
     // 1JPM version 3.3.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
-    // To upgrade JPM, replace everything below with its newer version
+    // Do not edit anything below, since changes will be lost due to auto-updating.
+    // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
     public static final String mavenVersion = "3.9.8";
     public static final String mavenWrapperVersion = "3.3.2";
@@ -141,7 +144,7 @@ public class JPM {
         String wrapperUrl = mavenWrapperScriptUrlBase + script.getName();
 
         System.out.println("Downloading file from: " + wrapperUrl);
-        URL url = new URL(wrapperUrl);
+        URL url = toUrl(wrapperUrl);
         script.getParentFile().mkdirs();
         Files.copy(url.openStream(), script.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
@@ -150,7 +153,7 @@ public class JPM {
         String wrapperUrl = mavenWrapperJarUrl;
 
         System.out.println("Downloading file from: " + wrapperUrl);
-        URL url = new URL(wrapperUrl);
+        URL url = toUrl(wrapperUrl);
         jar.getParentFile().mkdirs();
         Files.copy(url.openStream(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
@@ -224,8 +227,26 @@ public class JPM {
     public static void updateSelfIfNeeded() {
         try{
             System.out.println("Downloading file from: " + jpmLatestUrl);
-            File jpmFile = new File(System.getProperty("user.dir") + "/JPM.java");
-            URL url = new URL(jpmLatestUrl);
+            File cwd = new File(System.getProperty("user.dir"));
+            File jpmFile = new File(cwd + "/JPM.java");
+
+            if (!jpmFile.exists()) {
+                jpmFile = new File(cwd + "/src/main/java/JPM.java");
+                if (!jpmFile.exists()) {
+                    String jpmPackagePath = "/"+JPM.class.getPackage().getName().replace(".", "/");
+                    jpmFile = new File(cwd+"/src/main/java"+jpmPackagePath+"/JPM.java");
+
+                    // If still not found, search all subdirs by shallowest first
+                    if (!jpmFile.exists()) {
+                        jpmFile = searchForFileBreadthFirst(cwd, "JPM.java");
+                        if (jpmFile == null) {
+                            throw new FileNotFoundException("JPM.java file not found in the project directory.");
+                        }
+                    }
+                }
+            }
+
+            URL url = toUrl(jpmLatestUrl);
             jpmFile.getParentFile().mkdirs();
 
             String jpmJavaContent = contentToString(url);
@@ -261,6 +282,27 @@ public class JPM {
             e.printStackTrace();
         }
     }
+
+    private static File searchForFileBreadthFirst(File rootDir, String fileName) {
+        Queue<File> directories = new LinkedList<>();
+        directories.add(rootDir);
+
+        while (!directories.isEmpty()) {
+            File dir = directories.poll();
+            File[] files = dir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        directories.add(file);  // Add directories to the queue for further searching
+                    } else if (file.getName().equals(fileName)) {
+                        return file;  // Return the file if found
+                    }
+                }
+            }
+        }
+        return null;  // File not found
+    }
+
 
     private static String extractJPMVersion(String content) {
         Pattern pattern = Pattern.compile("//\\s*1JPM\\s*version\\s*(\\d+\\.\\d+\\.\\d+)\\s*by\\s*Osiris-Team:");
@@ -335,6 +377,10 @@ public class JPM {
         return mergedImports.toString();
     }
 
+    private static URL toUrl(String url) throws MalformedURLException {
+        return URL.of(URI.create(url), null);
+    }
+
 
     /**
      * This is going to download and copy the latest JPM.java file into all child projects it can find in this directory,
@@ -370,7 +416,7 @@ public class JPM {
                     continue;
                 }
                 System.out.println("Downloading file from: " + jpmLatestUrl);
-                URL url = new URL(jpmLatestUrl);
+                URL url = toUrl(jpmLatestUrl);
                 jpmFile.getParentFile().mkdirs();
                 String jpmJavaContent = contentToString(url);
                 jpmJavaContent = jpmJavaContent.replace(".myproject", "."+childProjectDir.getName())
@@ -498,7 +544,7 @@ public class JPM {
             for (Repository _repo : project.repositories) {
                 String repo = _repo.url;
                 try {
-                    URL url = new URL(repo + "/" + groupId.replace('.', '/') + "/" + artifactId + "/maven-metadata.xml");
+                    URL url = toUrl(repo + "/" + groupId.replace('.', '/') + "/" + artifactId + "/maven-metadata.xml");
                     System.out.println("Checking repository: " + url);
                     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                     connection.setRequestMethod("GET");
