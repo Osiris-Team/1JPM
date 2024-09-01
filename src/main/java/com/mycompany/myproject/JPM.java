@@ -45,7 +45,6 @@ public class JPM {
             // Add dependencies
             implementation("org.apache.commons:commons-lang3:3.12.0");
             testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
-            $("hi");
 
             // Add compiler arguments
             addCompilerArg("-Xlint:unchecked");
