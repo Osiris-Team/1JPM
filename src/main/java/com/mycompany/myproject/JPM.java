@@ -20,6 +20,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class JPM {
     public static class ThisProject extends JPM.Project {
@@ -41,6 +43,7 @@ public class JPM {
             // Add dependencies
             implementation("org.apache.commons:commons-lang3:3.12.0");
             testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.3");
+            $("hi");
 
             // Add compiler arguments
             addCompilerArg("-Xlint:unchecked");
@@ -75,6 +78,8 @@ public class JPM {
     public static final String mavenWrapperJarUrl = "https://repo1.maven.org/maven2/org/apache/maven/wrapper/maven-wrapper/"+ mavenWrapperVersion +"/maven-wrapper-"+ mavenWrapperVersion +".jar";
     public static final String mavenWrapperPropsContent = "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/"+ mavenVersion +"/apache-maven-"+ mavenVersion +"-bin.zip";
     public static final String jpmLatestUrl = "https://github.com/Osiris-Team/1JPM/raw/main/src/main/java/com/mycompany/myproject/JPM.java";
+    public static final String propsFileName = "JPM.properties";
+    public static final Map<String, String> propsKeyValCache = new HashMap<>();
 
     /**
      * Running {@link #main(String[])} without arguments / empty arguments
@@ -163,6 +168,169 @@ public class JPM {
     }
 
     /**
+     * Returns the value as string from the nearest JPM.properties file, or an empty string if not found/defined in the complete dir tree.<br>
+     * <br>
+     * By "nearest" we mean: If the value didn't exist in a JPM.properties file in the current working directory,
+     * we check all JPM.properties files until the root of the disk.
+     *
+     * @param key The key to search for in the properties files.
+     * @return The value associated with the key, or an empty string if not defined.
+     */
+    public static String $(String key) {
+        // Check if the key is already in the cache
+        if (propsKeyValCache.containsKey(key)) {
+            return propsKeyValCache.get(key);
+        }
+
+        File currentDir = new File(System.getProperty("user.dir"));
+
+        while (currentDir != null) {
+            File propertiesFile = new File(currentDir, propsFileName);
+
+            if (propertiesFile.exists() && propertiesFile.isFile()) {
+                try (FileInputStream fis = new FileInputStream(propertiesFile)) {
+                    Properties properties = new Properties();
+                    properties.load(fis);
+                    String value = properties.getProperty(key);
+                    if (value != null) {
+                        propsKeyValCache.put(key, value); // Cache the result
+                        return value;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // If there's an issue reading the file, continue to the parent directory
+                }
+            }
+
+            currentDir = currentDir.getParentFile();
+        }
+
+        // If the key was not found in any properties file, return an empty string
+        propsKeyValCache.put(key, ""); // Cache the empty result
+        return "";
+    }
+
+    /**
+     * This updates the JPM.java file in the current working dir by doing the following: <br>
+     * 1. Downloads the latest JPM.java file into memory. <br>
+     * 2. Checks its version by searching for a string like "// 1JPM version 3.2.0 by Osiris-Team:" and extracting the version from that. <br>
+     * 3. Check the current version by doing the same for the current JPM.java file <br>
+     * 4. If the downloaded JPM.java file is newer we update. <br>
+     * 5. The actual update is done by extracting everything up to "// 1JPM version <version> by Osiris-Team:" from the current JPM.java file, <br>
+     * then extracting everything starting at "// 1JPM version <version> by Osiris-Team:" (this line will also be included) until the end of the latest JPM.java file, <br>
+     * then finally combining those 2 strings and overwriting the current JPM.java file, imports of both files will also be merged.
+     */
+    public static void updateSelfIfNeeded() throws Exception {
+        System.out.println("Downloading file from: " + jpmLatestUrl);
+        File jpmFile = new File(System.getProperty("user.dir") + "/JPM.java");
+        URL url = new URL(jpmLatestUrl);
+        jpmFile.getParentFile().mkdirs();
+
+        String jpmJavaContent = contentToString(url);
+        String latestVersion = extractJPMVersion(jpmJavaContent);
+        String currentJpmJavaContent = contentToString(jpmFile);
+        String currentVersion = extractJPMVersion(currentJpmJavaContent);
+
+        // Compare versions
+        if (latestVersion.compareTo(currentVersion) > 0) {
+            System.out.println("A newer JPM version is available ("+currentVersion+" -> "+latestVersion+"). Updating...");
+
+            // Extract and merge imports
+            String mergedImports = mergeJPMImports(currentJpmJavaContent, jpmJavaContent);
+
+            // Extract parts for merging
+            String currentHeader = extractCurrentJPMHead(currentJpmJavaContent);
+            String latestBody = extractLatestJPMBody(jpmJavaContent);
+
+            // Combine the header of the current file, merged imports, and the body of the latest file
+            String updatedJpmJavaContent = currentHeader + mergedImports + "\n" + latestBody;
+
+            // Overwrite the current JPM.java file with the updated content
+            try (FileWriter writer = new FileWriter(jpmFile)) {
+                writer.write(updatedJpmJavaContent);
+            }
+
+            System.out.println("JPM update completed to version " + latestVersion+", please re-run to use the latest version!");
+        } else {
+            System.out.println("No JPM update needed. You are already on the latest version (" + currentVersion + ").");
+        }
+    }
+
+    private static String extractJPMVersion(String content) {
+        Pattern pattern = Pattern.compile("//\\s*1JPM\\s*version\\s*(\\d+\\.\\d+\\.\\d+)\\s*by\\s*Osiris-Team:");
+        Matcher matcher = pattern.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
+        } else {
+            throw new IllegalStateException("Could not find version information in the provided content.");
+        }
+    }
+
+    /**
+     * Starts after the imports.
+     */
+    private static String extractCurrentJPMHead(String content) {
+        // Use regex to find the end of the imports section
+        Pattern importPattern = Pattern.compile("^import\\s+.*?;$", Pattern.MULTILINE);
+        Matcher importMatcher = importPattern.matcher(content);
+
+        int lastImportEndIndex = 0;
+        while (importMatcher.find()) {
+            lastImportEndIndex = importMatcher.end();
+        }
+
+        // Start searching for the version comment after the imports
+        Pattern versionPattern = Pattern.compile("//\\s*1JPM\\s*version\\s*\\d+\\.\\d+\\.\\d+\\s*by\\s*Osiris-Team:");
+        Matcher versionMatcher = versionPattern.matcher(content);
+
+        if (versionMatcher.find(lastImportEndIndex)) {
+            int versionStartIndex = versionMatcher.start();
+            return content.substring(lastImportEndIndex, versionStartIndex);
+        } else {
+            throw new IllegalStateException("Could not (extractCurrentJPMHead) find version information in the current content.");
+        }
+    }
+
+    private static String extractLatestJPMBody(String content) {
+        // Use regex to find the version comment line, matching any version number
+        Pattern pattern = Pattern.compile("//\\s*1JPM\\s*version\\s*\\d+\\.\\d+\\.\\d+\\s*by\\s*Osiris-Team:");
+        Matcher matcher = pattern.matcher(content);
+
+        if (matcher.find()) {
+            int index = matcher.start();
+            return content.substring(index);
+        } else {
+            throw new IllegalStateException("Could not (extractBody) find version information in the latest content.");
+        }
+    }
+
+    private static String mergeJPMImports(String currentContent, String latestContent) {
+        Set<String> imports = new HashSet<>();
+        Pattern importPattern = Pattern.compile("^import\\s+.*?;$", Pattern.MULTILINE);
+
+        // Extract imports from the current content
+        Matcher currentMatcher = importPattern.matcher(currentContent);
+        while (currentMatcher.find()) {
+            imports.add(currentMatcher.group());
+        }
+
+        // Extract imports from the latest content
+        Matcher latestMatcher = importPattern.matcher(latestContent);
+        while (latestMatcher.find()) {
+            imports.add(latestMatcher.group());
+        }
+
+        // Combine all unique imports into a single string
+        StringBuilder mergedImports = new StringBuilder();
+        for (String imp : imports) {
+            mergedImports.append(imp).append("\n");
+        }
+
+        return mergedImports.toString();
+    }
+
+
+    /**
      * This is going to download and copy the latest JPM.java file into all child projects it can find in this directory,
      * and also run that file to generate an initial pom.xml. The child projects name will be the same as its root directory name.<br>
      * <br>
@@ -198,7 +366,7 @@ public class JPM {
                 System.out.println("Downloading file from: " + jpmLatestUrl);
                 URL url = new URL(jpmLatestUrl);
                 jpmFile.getParentFile().mkdirs();
-                String jpmJavaContent = readUrlContentAsString(url);
+                String jpmJavaContent = contentToString(url);
                 jpmJavaContent = jpmJavaContent.replace(".myproject", "."+childProjectDir.getName())
                         .replace("my-project", childProjectDir.getName());
                 Files.write(jpmFile.toPath(), jpmJavaContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
@@ -246,6 +414,17 @@ public class JPM {
     }
 
     /**
+     * Overloaded method to use UTF-8 as the default charset.
+     *
+     * @param url The URL to read from.
+     * @return The content of the URL as a String.
+     * @throws Exception If an I/O error occurs.
+     */
+    public static String contentToString(URL url) throws Exception {
+        return contentToString(url, StandardCharsets.UTF_8);
+    }
+
+    /**
      * Reads the content of a URL as binary data and converts it to a String.
      *
      * @param url The URL to read from.
@@ -253,29 +432,29 @@ public class JPM {
      * @return The content of the URL as a String.
      * @throws Exception If an I/O error occurs.
      */
-    public static String readUrlContentAsString(URL url, Charset charset) throws Exception {
-        try (InputStream inputStream = url.openStream();
-             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+    public static String contentToString(URL url, Charset charset) throws Exception {
+        try (InputStream inputStream = url.openStream()){
+            return contentToString(inputStream, charset);
+        }
+    }
+
+    private static String contentToString(File file) throws Exception {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            return contentToString(fis, StandardCharsets.UTF_8);
+        }
+    }
+
+    public static String contentToString(InputStream in, Charset charset) throws IOException {
+        try(ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
 
             byte[] buffer = new byte[1024];
             int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
+            while ((bytesRead = in.read(buffer)) != -1) {
                 byteArrayOutputStream.write(buffer, 0, bytesRead);
             }
 
             return byteArrayOutputStream.toString(charset.name());
         }
-    }
-
-    /**
-     * Overloaded method to use UTF-8 as the default charset.
-     *
-     * @param url The URL to read from.
-     * @return The content of the URL as a String.
-     * @throws Exception If an I/O error occurs.
-     */
-    public static String readUrlContentAsString(URL url) throws Exception {
-        return readUrlContentAsString(url, StandardCharsets.UTF_8);
     }
 
     //

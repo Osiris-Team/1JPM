@@ -101,6 +101,10 @@ Note that a child project is expected to be directly inside a subdirectory of th
 
 Now `project.isAutoParentsAndChildren` will work properly, since all needed pom.xml files should exist.
 
+Do you also need something like global variables across those projects? 
+Then the `String val = $("key");` function might be of help to you,
+since it can easily retrieve values for props defined in the nearest JPM.properties file.
+
 </details>
 
 #### 1JPM can create native executables
