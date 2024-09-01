@@ -89,6 +89,7 @@ public class JPM {
     public static Object expectation1 = new Object();
 
     static{
+        updateSelfIfNeeded(); // Comment this to disable self-updating, remember to comment again after updating manually!
         // Init this once to ensure their plugins are added if they use the static constructor
         new ThirdPartyPlugins();
     }
@@ -220,39 +221,44 @@ public class JPM {
      * then extracting everything starting at "// 1JPM version <version> by Osiris-Team:" (this line will also be included) until the end of the latest JPM.java file, <br>
      * then finally combining those 2 strings and overwriting the current JPM.java file, imports of both files will also be merged.
      */
-    public static void updateSelfIfNeeded() throws Exception {
-        System.out.println("Downloading file from: " + jpmLatestUrl);
-        File jpmFile = new File(System.getProperty("user.dir") + "/JPM.java");
-        URL url = new URL(jpmLatestUrl);
-        jpmFile.getParentFile().mkdirs();
+    public static void updateSelfIfNeeded() {
+        try{
+            System.out.println("Downloading file from: " + jpmLatestUrl);
+            File jpmFile = new File(System.getProperty("user.dir") + "/JPM.java");
+            URL url = new URL(jpmLatestUrl);
+            jpmFile.getParentFile().mkdirs();
 
-        String jpmJavaContent = contentToString(url);
-        String latestVersion = extractJPMVersion(jpmJavaContent);
-        String currentJpmJavaContent = contentToString(jpmFile);
-        String currentVersion = extractJPMVersion(currentJpmJavaContent);
+            String jpmJavaContent = contentToString(url);
+            String latestVersion = extractJPMVersion(jpmJavaContent);
+            String currentJpmJavaContent = contentToString(jpmFile);
+            String currentVersion = extractJPMVersion(currentJpmJavaContent);
 
-        // Compare versions
-        if (latestVersion.compareTo(currentVersion) > 0) {
-            System.out.println("A newer JPM version is available ("+currentVersion+" -> "+latestVersion+"). Updating...");
+            // Compare versions
+            if (latestVersion.compareTo(currentVersion) > 0) {
+                System.out.println("A newer JPM version is available ("+currentVersion+" -> "+latestVersion+"). Updating...");
 
-            // Extract and merge imports
-            String mergedImports = mergeJPMImports(currentJpmJavaContent, jpmJavaContent);
+                // Extract and merge imports
+                String mergedImports = mergeJPMImports(currentJpmJavaContent, jpmJavaContent);
 
-            // Extract parts for merging
-            String currentHeader = extractCurrentJPMHead(currentJpmJavaContent);
-            String latestBody = extractLatestJPMBody(jpmJavaContent);
+                // Extract parts for merging
+                String currentHeader = extractCurrentJPMHead(currentJpmJavaContent);
+                String latestBody = extractLatestJPMBody(jpmJavaContent);
 
-            // Combine the header of the current file, merged imports, and the body of the latest file
-            String updatedJpmJavaContent = currentHeader + mergedImports + "\n" + latestBody;
+                // Combine the header of the current file, merged imports, and the body of the latest file
+                String updatedJpmJavaContent = currentHeader + mergedImports + "\n" + latestBody;
 
-            // Overwrite the current JPM.java file with the updated content
-            try (FileWriter writer = new FileWriter(jpmFile)) {
-                writer.write(updatedJpmJavaContent);
+                // Overwrite the current JPM.java file with the updated content
+                try (FileWriter writer = new FileWriter(jpmFile)) {
+                    writer.write(updatedJpmJavaContent);
+                }
+
+                System.out.println("JPM update completed to version " + latestVersion+", please re-run to use the latest version!");
+            } else {
+                System.out.println("No JPM update needed. You are already on the latest version (" + currentVersion + ").");
             }
-
-            System.out.println("JPM update completed to version " + latestVersion+", please re-run to use the latest version!");
-        } else {
-            System.out.println("No JPM update needed. You are already on the latest version (" + currentVersion + ").");
+        } catch (Exception e) {
+            System.err.println("Self-updating failed!");
+            e.printStackTrace();
         }
     }
 
