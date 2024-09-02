@@ -70,7 +70,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.3.0 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -934,11 +934,14 @@ public class JPM {
          * Usually you will override this.
          */
         public XML toXML(Project project, XML projectXML) {
-            Details details = new Details(this, project, projectXML);
-            executeBeforeToXML(details);
+
 
             // Create an XML object for the <plugin> element
             XML xml = new XML("plugin");
+
+            Details details = new Details(this, project, projectXML, xml);
+            executeBeforeToXML(details);
+
             xml.put("groupId", groupId);
             xml.put("artifactId", artifactId);
             if(version != null && !version.isEmpty()) xml.put("version", version);
@@ -969,15 +972,17 @@ public class JPM {
         public static class Details {
             public Plugin plugin;
             public Project project;
-            public XML xml;
+            public XML projectXml;
+            public XML pluginXml;
             public Map<String, String> configuration = new HashMap<>();
             public List<Execution> executions = new ArrayList<>();
             public List<Dependency> dependencies = new ArrayList<>();
 
-            public Details(Plugin plugin, Project project, XML xml) {
+            public Details(Plugin plugin, Project project, XML projectXml, XML pluginXml) {
                 this.plugin = plugin;
                 this.project = project;
-                this.xml = xml;
+                this.projectXml = projectXml;
+                this.pluginXml = pluginXml;
             }
 
             public Details putConfiguration(String key, String value) {
@@ -1814,7 +1819,7 @@ public class JPM {
                     for (Map.Entry<String, String> entry : environment.entrySet()) {
                         envXml.put(entry.getKey(), entry.getValue());
                     }
-                    d.xml.add("configuration", envXml);
+                    d.projectXml.add("configuration", envXml);
                 }
 
                 if (!systemPropertyVariables.isEmpty()) {
@@ -1822,7 +1827,7 @@ public class JPM {
                     for (Map.Entry<String, String> entry : systemPropertyVariables.entrySet()) {
                         sysPropXml.put(entry.getKey(), entry.getValue());
                     }
-                    d.xml.add("configuration", sysPropXml);
+                    d.projectXml.add("configuration", sysPropXml);
                 }
 
                 if (!buildArgs.isEmpty()) {
@@ -1830,7 +1835,7 @@ public class JPM {
                     for (String arg : buildArgs) {
                         buildArgsXml.put("buildArg", arg);
                     }
-                    d.xml.add("configuration", buildArgsXml);
+                    d.projectXml.add("configuration", buildArgsXml);
                 }
 
                 if (!jvmArgs.isEmpty()) {
@@ -1838,7 +1843,7 @@ public class JPM {
                     for (String arg : jvmArgs) {
                         jvmArgsXml.put("arg", arg);
                     }
-                    d.xml.add("configuration", jvmArgsXml);
+                    d.projectXml.add("configuration", jvmArgsXml);
                 }
 
                 if (!configurationFileDirectories.isEmpty()) {
@@ -1846,7 +1851,7 @@ public class JPM {
                     for (String dir : configurationFileDirectories) {
                         configDirsXml.put("dir", dir);
                     }
-                    d.xml.add("configuration", configDirsXml);
+                    d.projectXml.add("configuration", configDirsXml);
                 }
 
                 if (!classpath.isEmpty()) {
@@ -1854,7 +1859,7 @@ public class JPM {
                     for (String cp : classpath) {
                         classpathXml.put("param", cp);
                     }
-                    d.xml.add("configuration", classpathXml);
+                    d.projectXml.add("configuration", classpathXml);
                 }
 
                 if (classesDirectory != null) {
@@ -1862,11 +1867,11 @@ public class JPM {
                 }
 
                 if (agentConfig != null) {
-                    d.xml.add("configuration agent", agentConfig.toXML());
+                    d.projectXml.add("configuration agent", agentConfig.toXML());
                 }
 
                 if (metadataRepositoryConfig != null) {
-                    d.xml.add("configuration metadataRepository", metadataRepositoryConfig.toXML());
+                    d.projectXml.add("configuration metadataRepository", metadataRepositoryConfig.toXML());
                 }
             });
         }

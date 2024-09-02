@@ -76,7 +76,7 @@ Above you can see the example configuration which runs the `clean package` tasks
 This compiles and creates a jar file from your code, and additionally creates the sources,
 javadoc and with-dependencies jars.
 
-### Additional goodies
+### Additional goodies and FAQ
 
 #### 1JPM automatically resolves parent and child projects
 <details>
@@ -181,6 +181,31 @@ How many lines of relevant build code do we save compared to Maven?
 - Maven: 391 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/pom.xml))
 
 Thus we write the same config with **263 lines less** code (which is a **3x** saving) when using 1JPM!
+</details>
+
+
+#### How can I modify the generated pom.xml file? How to use the XML class?
+<details>
+<summary></summary>
+
+Inside your ThisProject class you can override the toXML() like so:
+```java
+@java.lang.Override
+public com.mycompany.core.JPM.XML toXML() {
+   XML pom = super.toXML(); // Returns <project> element that is fully populated based on ThisProject settings
+   
+   // Modify here, the example below adds a <resource> 
+   // (which will ultimately add non .java files to the output jar too, just an example)
+   XML res = new XML("resource");
+   res.put("directory", "src/main/java");
+   res.put("filtering", "false");
+   res.put("includes include", "**/*");
+   res.put("excludes exclude", "**/*.java");
+
+   pom.add("build resources resource", res);
+   return pom;
+}
+```
 </details>
 
 #### 1JPM is able to auto-update itself
