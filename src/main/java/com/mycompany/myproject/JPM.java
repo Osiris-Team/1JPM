@@ -111,7 +111,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.5 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.6 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -488,9 +488,13 @@ public class JPM {
         }
     }
 
-    private static void execJavaJpmJava(File childProjectDir) throws IOException, InterruptedException {
+    private static void execJavaJpmJava(File childProjectDir, String... additionalArgs) throws IOException, InterruptedException {
         ProcessBuilder p = new ProcessBuilder();
-        p.command("java", "JPM.java");
+        List<String> list = new ArrayList<>();
+        list.add("java");
+        list.add("JPM.java");
+        if(additionalArgs != null && additionalArgs.length > 0) list.addAll(Arrays.asList(additionalArgs));
+        p.command(list);
         p.inheritIO();
         p.directory(childProjectDir);
         System.out.println("Executing in child project '"+ childProjectDir.getName()+"': java JPM.java");
@@ -1307,8 +1311,10 @@ public class JPM {
 
             // If isAutoParentsAndChildren is true, handle parents and children automatically
             if (isAutoParentsAndChildren) {
-                updateParentsPoms(pom);
-                updateChildrenPoms();
+                appendParentInfoAndRegen(pom);
+                appendParentInfoToChildren();
+                // TODO also regen/update parents, since we depend on them and their JPM file might have changed
+                // does this cause infinite loop?
             }
 
             Path cwd = Paths.get(System.getProperty("user.dir"));
@@ -1330,11 +1336,11 @@ public class JPM {
             }
         }
 
-        protected void updateParentsPoms(XML currentPom) throws IOException {
-            updateParentsPoms(currentPom, new File(System.getProperty("user.dir")), null);
+        protected void appendParentInfoAndRegen(XML currentPom) throws IOException {
+            appendParentInfoAndRegen(currentPom, new File(System.getProperty("user.dir")), null);
         }
 
-        protected void updateParentsPoms(XML currentPom, File currentDir, File forceStopAtDir) throws IOException {
+        protected void appendParentInfoAndRegen(XML currentPom, File currentDir, File forceStopAtDir) throws IOException {
             if(currentDir == null){
                 System.out.println("Force end probably at disk root, because currentDir is null.");
                 return;
@@ -1350,6 +1356,13 @@ public class JPM {
 
                 parentPom = new File(parentDir, "pom.xml");
                 if (parentPom.exists()) {
+                    // Regen parent
+                    try {
+                        execJavaJpmJava(parentDir, "skipMaven"); // Only sync, no build);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
                     // Load and update parent pom.xml
                     System.out.println("Subproject '"+currentDir.getName()+"', found parent pom.xml at: " + parentPom.getAbsolutePath());
                     XML parent = new XML(parentPom);
@@ -1385,16 +1398,16 @@ public class JPM {
             }
         }
 
-        protected void updateChildrenPoms() throws IOException {
+        protected void appendParentInfoToChildren() throws IOException {
             File currentDir = new File(System.getProperty("user.dir"));
-            updateChildrenPoms(currentDir);
+            appendParentInfoToChildren(currentDir);
         }
 
         /**
          * @param currentDir assume that this contains a pom.xml file that already was updated,
          *                  now we want to check its sub-dirs for child projects.
          */
-        protected void updateChildrenPoms(File currentDir) throws IOException {
+        protected void appendParentInfoToChildren(File currentDir) throws IOException {
             List<File> poms = new ArrayList<>();
             File[] subDirs = currentDir.listFiles(File::isDirectory);
             if(subDirs != null)
@@ -1428,7 +1441,7 @@ public class JPM {
 
                 // Update current child pom and all parent poms.
                 XML pom = new XML(childPom);
-                updateParentsPoms(pom, childPom.getParentFile(), forceStopAtDir);
+                appendParentInfoAndRegen(pom, childPom.getParentFile(), forceStopAtDir);
 
                 // Update visited list
                 File folder = childPom.getParentFile();
@@ -1667,7 +1680,7 @@ public class JPM {
          * Automatically configures plugin options using project defaults where available.
          */
         public PackagerPlugin() {
-            super("io.github.fvarrui", "javapackager", "latest-version-here");
+            super("io.github.fvarrui", "javapackager", "1.7.6");
             onBeforeToXML(d -> {
                 // Use project defaults where applicable
                 if (mainClass != null && !mainClass.isEmpty()) {

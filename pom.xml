@@ -17,7 +17,7 @@ AUTO-GENERATED FILE, CHANGES SHOULD BE DONE IN ./JPM.java or ./src/main/java/com
     </properties>
     <repositories>
         <repository>
-            <id>https:repomavenapacheorgmaven2</id>
+            <id>httpsrepo.maven.apache.orgmaven2</id>
             <url>https://repo.maven.apache.org/maven2</url>
         </repository>
     </repositories>
