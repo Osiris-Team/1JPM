@@ -16,9 +16,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -113,7 +111,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.3 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.4 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -125,6 +123,7 @@ public class JPM {
     public static final String jpmLatestUrl = "https://github.com/Osiris-Team/1JPM/raw/main/src/main/java/com/mycompany/myproject/JPM.java";
     public static final String propsFileName = "JPM.properties";
     public static final Map<String, String> propsKeyValCache = new HashMap<>();
+    public static boolean isJpmUpdated = false;
 
     /**
      * Running {@link #main(String[])} without arguments / empty arguments
@@ -137,6 +136,13 @@ public class JPM {
         updateSelfIfNeeded(); // Comment this to disable self-updating, remember to comment again after updating manually!
         // Init this once to ensure their plugins are added if they use the static constructor
         new ThirdPartyPlugins();
+
+        if(isJpmUpdated){
+            System.out.print("\n\n\n\n");
+            System.out.println("!!! JPM WAS JUST UPDATED, THUS THIS RUN DOES NOT YET BENEFIT FROM THE NEWEST CHANGES !!!");
+            System.out.println("--> RE-RUN THIS TO RUN WITH THE UPDATED JPM VERSION.");
+            System.out.print("\n\n\n\n");
+        }
     }
 
     /**
@@ -151,11 +157,15 @@ public class JPM {
     }
 
     public static void executeMaven(String... args) throws IOException, InterruptedException {
+        executeMaven(null, args);
+    }
+
+    public static void executeMaven(File userDir, String... args) throws IOException, InterruptedException {
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
         ProcessBuilder p = new ProcessBuilder();
         List<String> finalArgs = new ArrayList<>();
-        File userDir = new File(System.getProperty("user.dir"));
+        if(userDir == null) userDir = new File(System.getProperty("user.dir"));
         File mavenWrapperFile = new File(userDir, "mvnw" + (isWindows ? ".cmd" : ""));
         File propertiesFile = new File(userDir, ".mvn/wrapper/maven-wrapper.properties");
         File mavenWrapperJarFile = new File(userDir, ".mvn/wrapper/maven-wrapper.jar");
@@ -315,6 +325,7 @@ public class JPM {
                     writer.write(updatedJpmJavaContent);
                 }
 
+                isJpmUpdated = true;
                 System.out.println("JPM update completed to version " + latestVersion+", please re-run to use the latest version!");
             } else {
                 System.out.println("No JPM update needed. You are already on the latest version (" + currentVersion + ").");
@@ -656,6 +667,10 @@ public class JPM {
         public List<Dependency> transitiveDependencies;
         public List<Dependency> excludedDependencies = new ArrayList<>();
         public String type = "";
+        /**
+         * If provided builds this dependency before building the project.
+         */
+        public String localProjectPath = "";
 
         public Dependency(Project project, String groupId, String artifactId, String version) {
             this(project, groupId, artifactId, version, "compile", new ArrayList<>());
@@ -733,7 +748,7 @@ public class JPM {
         }
 
         public static Repository fromUrl(String url){
-            String id = url.replaceAll("\\\\/:\"<>\\|\\?\\*", "");
+            String id = url.replaceAll("[\\\\/:\"<>|?*]", "");
             return new Repository(id, url);
         }
 
@@ -1273,6 +1288,11 @@ public class JPM {
             return xml;
         }
 
+        /**
+         * Writes the pom.xml file (see {@link #toXML()}) and also updates/re-generates parent/child poms. <br>
+         * Checks dependencies
+         * @throws IOException
+         */
         public void generatePom() throws IOException {
             XML pom = toXML();
 
@@ -1287,6 +1307,23 @@ public class JPM {
             if (isAutoParentsAndChildren) {
                 updateParentsPoms(pom);
                 updateChildrenPoms();
+            }
+
+            Path cwd = Paths.get(System.getProperty("user.dir"));
+            for (Dependency dependency : dependencies) {
+                if(dependency.localProjectPath != null && !dependency.localProjectPath.isEmpty()){
+                    Path projectPath = Paths.get(dependency.localProjectPath);
+                    if(dependency.localProjectPath.startsWith(".")){
+                        // Resolve the relative path against the current directory
+                        projectPath = cwd.resolve(projectPath).normalize();
+                    }
+                    try {
+                        executeMaven(projectPath.toFile(), "install");
+                    } catch (Exception e) {
+                        System.err.println("Failed to build dependency "+dependency.toString()+" with local project path: "+ projectPath);
+                        e.printStackTrace();
+                    }
+                }
             }
         }
 
