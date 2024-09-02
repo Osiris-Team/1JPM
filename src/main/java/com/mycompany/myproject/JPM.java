@@ -1313,8 +1313,6 @@ public class JPM {
             if (isAutoParentsAndChildren) {
                 appendParentInfoAndRegen(pom);
                 appendParentInfoToChildren();
-                // TODO also regen/update parents, since we depend on them and their JPM file might have changed
-                // does this cause infinite loop?
             }
 
             Path cwd = Paths.get(System.getProperty("user.dir"));
