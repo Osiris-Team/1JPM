@@ -111,7 +111,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.6 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.7 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -1294,7 +1294,7 @@ public class JPM {
         }
 
         /**
-         * Writes the pom.xml file (see {@link #toXML()}) and also updates/re-generates parent/child poms. <br>
+         * Writes the pom.xml file (see {@link #toXML()}). It DOES NOT update/re-generate parent/child poms, thus you must make sure they are always in sync with their JPM.java files. <br>
          * For any dependency that has localProjectPath set, it will try to update its pom and also run "maven install",
          * so that the dependency is built and ready to use in this project. <br>
          * @throws IOException
@@ -1311,7 +1311,7 @@ public class JPM {
 
             // If isAutoParentsAndChildren is true, handle parents and children automatically
             if (isAutoParentsAndChildren) {
-                appendParentInfoAndRegen(pom);
+                appendParentInfo(pom);
                 appendParentInfoToChildren();
             }
 
@@ -1334,11 +1334,11 @@ public class JPM {
             }
         }
 
-        protected void appendParentInfoAndRegen(XML currentPom) throws IOException {
-            appendParentInfoAndRegen(currentPom, new File(System.getProperty("user.dir")), null);
+        protected void appendParentInfo(XML currentPom) throws IOException {
+            appendParentInfo(currentPom, new File(System.getProperty("user.dir")), null);
         }
 
-        protected void appendParentInfoAndRegen(XML currentPom, File currentDir, File forceStopAtDir) throws IOException {
+        protected void appendParentInfo(XML currentPom, File currentDir, File forceStopAtDir) throws IOException {
             if(currentDir == null){
                 System.out.println("Force end probably at disk root, because currentDir is null.");
                 return;
@@ -1355,11 +1355,9 @@ public class JPM {
                 parentPom = new File(parentDir, "pom.xml");
                 if (parentPom.exists()) {
                     // Regen parent
-                    try {
-                        execJavaJpmJava(parentDir, "skipMaven"); // Only sync, no build);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    // We cannot do this since it causes an infinite loop, the user must ensure the parent pom is the latest
+                    //execJavaJpmJava(parentDir, "skipMaven"); // Only sync, no build);
+
 
                     // Load and update parent pom.xml
                     System.out.println("Subproject '"+currentDir.getName()+"', found parent pom.xml at: " + parentPom.getAbsolutePath());
@@ -1439,7 +1437,7 @@ public class JPM {
 
                 // Update current child pom and all parent poms.
                 XML pom = new XML(childPom);
-                appendParentInfoAndRegen(pom, childPom.getParentFile(), forceStopAtDir);
+                appendParentInfo(pom, childPom.getParentFile(), forceStopAtDir);
 
                 // Update visited list
                 File folder = childPom.getParentFile();
