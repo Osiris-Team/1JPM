@@ -70,7 +70,50 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
 
-    // 1JPM version 3.3.1 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 1JPM version 3.3.2 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -265,7 +308,7 @@ public class JPM {
                 String latestBody = extractLatestJPMBody(jpmJavaContent);
 
                 // Combine the header of the current file, merged imports, and the body of the latest file
-                String updatedJpmJavaContent = currentHeader + mergedImports + "\n" + latestBody;
+                String updatedJpmJavaContent = mergedImports + "\n\n" + currentHeader + "\n" + latestBody;
 
                 // Overwrite the current JPM.java file with the updated content
                 try (FileWriter writer = new FileWriter(jpmFile)) {
@@ -690,7 +733,7 @@ public class JPM {
         }
 
         public static Repository fromUrl(String url){
-            String id = url.split("//")[1].split("/")[0].replace(".", "").replace("-", "");
+            String id = url.replace("/", "").replace(".", "").replace("-", "");
             return new Repository(id, url);
         }
 

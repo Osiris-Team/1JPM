@@ -3,7 +3,7 @@
 It's a single Java file itself, which should be edited by you to configure your project.
 Meaning instead of writing XML or Groovy/DSL, your build file is Java code too.
 
-**To build your project, simply [drag-and-drop the JPM.java file](https://github.com/Osiris-Team/1JPM/releases/) 
+**To build your project, simply [drag-and-drop the JPM.java file](./src/main/java/com/mycompany/myproject/JPM.java) 
 into your project, open a terminal and execute `java JPM.java` (Java 11 and above).**
 
 <details>
