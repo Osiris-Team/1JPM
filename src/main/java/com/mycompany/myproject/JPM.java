@@ -111,7 +111,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.4 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.5 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -180,6 +180,7 @@ public class JPM {
         finalArgs.add(mavenWrapperFile.getAbsolutePath());
         finalArgs.addAll(Arrays.asList(args));
         p.command(finalArgs);
+        p.directory(userDir);
         p.inheritIO();
         System.out.print("Executing: ");
         for (String arg : finalArgs) {
@@ -1290,7 +1291,8 @@ public class JPM {
 
         /**
          * Writes the pom.xml file (see {@link #toXML()}) and also updates/re-generates parent/child poms. <br>
-         * Checks dependencies
+         * For any dependency that has localProjectPath set, it will try to update its pom and also run "maven install",
+         * so that the dependency is built and ready to use in this project. <br>
          * @throws IOException
          */
         public void generatePom() throws IOException {
@@ -1318,6 +1320,7 @@ public class JPM {
                         projectPath = cwd.resolve(projectPath).normalize();
                     }
                     try {
+                        execJavaJpmJava(projectPath.toFile());
                         executeMaven(projectPath.toFile(), "install");
                     } catch (Exception e) {
                         System.err.println("Failed to build dependency "+dependency.toString()+" with local project path: "+ projectPath);
