@@ -202,7 +202,7 @@ public com.mycompany.core.JPM.XML toXML() {
    res.put("includes include", "**/*");
    res.put("excludes exclude", "**/*.java");
 
-   pom.add("build resources resource", res);
+   pom.add("build resources", res);
    return pom;
 }
 ```
