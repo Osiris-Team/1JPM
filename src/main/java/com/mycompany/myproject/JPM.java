@@ -113,7 +113,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.2 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.3 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -733,7 +733,7 @@ public class JPM {
         }
 
         public static Repository fromUrl(String url){
-            String id = url.replace("/", "").replace(".", "").replace("-", "");
+            String id = url.replaceAll("\\\\/:\"<>\\|\\?\\*", "");
             return new Repository(id, url);
         }
 
