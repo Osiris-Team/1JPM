@@ -111,7 +111,7 @@ public class JPM {
 
 
 
-    // 1JPM version 3.3.7 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.8 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -432,7 +432,7 @@ public class JPM {
     }
 
     private static URL toUrl(String url) throws MalformedURLException {
-        return URL.of(URI.create(url), null);
+        return new URL(url);
     }
 
 
@@ -1591,7 +1591,7 @@ public class JPM {
     public static class EnforcerPlugin extends Plugin {
         public static EnforcerPlugin get = new EnforcerPlugin();
         public EnforcerPlugin() {
-            super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.3.0");
+            super("org.apache.maven.plugins", "maven-enforcer-plugin", "3.4.1");
             onBeforeToXML(d -> {
                 d.addExecution("enforce", null)
                         .addGoal("enforce")
@@ -1722,59 +1722,38 @@ public class JPM {
                 } else if (d.project.artifactId != null && !d.project.artifactId.isEmpty()) {
                     d.putConfiguration("name", d.project.artifactId);
                 }
+                d.addExecution("", "package").addGoal("package");
             });
         }
 
-        /**
-         * Adds a custom execution to the plugin.
-         *
-         * @param id The ID of the execution.
-         * @param phase The phase of the build lifecycle to attach the execution to (e.g., "package").
-         * @param executionConfig A Consumer function to configure the execution's goals and additional settings.
-         * @return The current PackagerPlugin instance for chaining.
-         */
-        public PackagerPlugin addExecution(String id, String phase, Consumer<Execution> executionConfig) {
-            Execution execution = new Execution(id, phase);
-            executionConfig.accept(execution);
-            this.onBeforeToXML(d -> d.addExecution(execution));
-            return this;
+        public Execution newWindowsExecution(){
+            Execution e = new Execution("", "package");
+            e.addGoal("package");
+            e.putConfiguration("platform", "windows");
+            e.putConfiguration("createZipball", "true");
+            return e;
         }
 
-        /**
-         * Adds multiple executions to the plugin, typically for creating packages
-         * for different platforms (Windows, Linux, Mac).
-         *
-         * @return The current PackagerPlugin instance for chaining.
-         */
-        public PackagerPlugin addMultipleExecutions() {
-            // Bundling for Windows
-            addExecution("bundling-for-windows", "package", e -> {
-                e.addGoal("package");
-                e.putConfiguration("platform", "windows");
-                e.putConfiguration("createZipball", "true");
-            });
+        public Execution newLinuxExecution(){
+            Execution e = new Execution("", "package");
+            e.addGoal("package");
+            e.putConfiguration("platform", "linux");
+            e.putConfiguration("createTarball", "true");
+            if (jrePath != null && !jrePath.isEmpty()) {
+                e.putConfiguration("jdkPath", jrePath);
+            }
+            return e;
+        }
 
-            // Bundling for Linux
-            addExecution("bundling-for-linux", "package", e -> {
-                e.addGoal("package");
-                e.putConfiguration("platform", "linux");
-                e.putConfiguration("createTarball", "true");
-                if (jrePath != null && !jrePath.isEmpty()) {
-                    e.putConfiguration("jdkPath", jrePath);
-                }
-            });
-
-            // Bundling for Mac
-            addExecution("bundling-for-mac", "package", e -> {
-                e.addGoal("package");
-                e.putConfiguration("platform", "mac");
-                e.putConfiguration("createTarball", "true");
-                if (jrePath != null && !jrePath.isEmpty()) {
-                    e.putConfiguration("jdkPath", jrePath);
-                }
-            });
-
-            return this;
+        public Execution newMacExecution(){
+            Execution e = new Execution("", "package");
+            e.addGoal("package");
+            e.putConfiguration("platform", "mac");
+            e.putConfiguration("createTarball", "true");
+            if (jrePath != null && !jrePath.isEmpty()) {
+                e.putConfiguration("jdkPath", jrePath);
+            }
+            return e;
         }
     }
 
