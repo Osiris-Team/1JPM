@@ -7,9 +7,9 @@ Meaning instead of writing XML or Groovy/DSL, your build file is Java code too.
 into your project, open a terminal and execute `java JPM.java` (Java 11 and above).**
 
 <details>
-<summary>Java 8 to 10 and JDK notes</summary>
+<summary>Older Java and JDK notes</summary>
 
-- Execute:  `javac JPM.java && java -cp . JPM`
+- Java 8 to 10:  `javac JPM.java && java -cp . JPM`
 - Earlier Java versions are not supported
 - Make sure you use a [globally installed JDK](https://adoptium.net/temurin/releases/?os=windows&package=jdk)
 (not JRE) with JAVA_HOME set
