@@ -67,50 +67,7 @@ public class JPM {
         // Add third party plugins below, find them here: https://github.com/topics/1jpm-plugin?o=desc&s=updated
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
     // 1JPM version 3.3.8 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
