@@ -18,7 +18,7 @@ into your project, open a terminal and execute `java JPM.java` (Java 11 and abov
 
 Good to know:
 - This repository functions as a template too
-- 1JPM is Maven based, thus great IDE support by default
+- 1JPM is a Maven pom.xml generator, thus great IDE support by default
 - 1JPM includes some extra plugins to increase runtime safety and provide additional features out of the box
 
 ```java
@@ -48,6 +48,7 @@ public class JPM {
             addCompilerArg("-Xlint:deprecation");
 
             // Add additional plugins
+            //JPM.plugins.add(NativeImagePlugin.get); // or enable built-in ones
             //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
             //    d.putConfiguration("mainClass", this.mainClass);
             //});
