@@ -79,6 +79,49 @@ javadoc and with-dependencies jars.
 
 ### Additional goodies and FAQ
 
+#### Write/Execute your custom Java code at build time
+<details>
+<summary></summary>
+
+A simple example is adding a timestamp/version of the current build
+somewhere in your application. Your application code then looks like this:
+```java
+//...
+            add(new H6("Version " + LocalDateTime.ofInstant(Instant.ofEpochMilli(/*CURRENT_MILLIS_AT_JPM_BUILD*/ 1747573889290L), ZoneId.systemDefault()).toLocalDate().toString()));
+//...
+```
+And inside the JPM class you add something like this:
+```java
+        // Replaces/Updates the current timestamp in the main class, looks like this: /*CURRENT_MILLIS_AT_JPM_BUILD*/1747573889290L
+        var srcFolder = new File(System.getProperty("user.dir") + "/src/main/java");
+        var mainFile = new File(srcFolder +"/"+ mainClass.replace(".", "/").replace("Main", "Main.java"));
+        var s = Files.readString(mainFile.toPath());
+        Files.writeString(mainFile.toPath(), s.replaceFirst("/\\*CURRENT_MILLIS_AT_JPM_BUILD\\*/\\d+L",
+                "/*CURRENT_MILLIS_AT_JPM_BUILD*/"+System.currentTimeMillis()+"L"));
+```
+</details>
+
+#### 1JPM helps porting your multi-module project
+<details>
+<summary></summary>
+
+Add JPM.java to your root project directory and add `JPM.portChildProjects();` before building.
+This is going to download and copy the latest JPM.java file into all child projects it can find
+in this directory, and also run it to generate an initial pom.xml for that child project.
+The child projects name will be the same as its directory name.
+
+A child project is detected
+if a src/main/java folder structure exists, and the parent folder of src/ is then used as child project root.  
+Note that a child project is expected to be directly inside a subdirectory of this project.
+
+Now `project.isAutoParentsAndChildren` will work properly, since all needed pom.xml files should exist.
+
+Do you also need something like global variables across those projects? 
+Then the `String val = $("key");` function might be of help to you,
+since it can easily retrieve values for props defined in the nearest JPM.properties file.
+
+</details>
+
 #### 1JPM automatically resolves parent and child projects
 <details>
 <summary></summary>
