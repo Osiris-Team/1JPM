@@ -79,15 +79,17 @@ javadoc and with-dependencies jars.
 
 ### Additional goodies and FAQ
 
-#### Write/Execute your custom Java code at build time
+#### 🕒 Execute your custom Java code at compile time
+Write your build scripts directly in Java!
+A simple usage example is adding a timestamp/version of the current build
+somewhere inside your actual application. Your application code in Main.java then looks like this:
+
 <details>
 <summary></summary>
 
-A simple example is adding a timestamp/version of the current build
-somewhere in your application. Your application code then looks like this:
 ```java
 //...
-            add(new H6("Version " + LocalDateTime.ofInstant(Instant.ofEpochMilli(/*CURRENT_MILLIS_AT_JPM_BUILD*/ 1747573889290L), ZoneId.systemDefault()).toLocalDate().toString()));
+            add(new H6("Version " + LocalDateTime.ofInstant(Instant.ofEpochMilli(/*CURRENT_MILLIS_AT_JPM_BUILD*/1747573889290L), ZoneId.systemDefault()).toLocalDate().toString()));
 //...
 ```
 And inside the JPM class you add something like this:
@@ -101,14 +103,15 @@ And inside the JPM class you add something like this:
 ```
 </details>
 
-#### 1JPM helps porting your multi-module project
-<details>
-<summary></summary>
-
+#### 🧩 1JPM helps porting your multi-module project
 Add JPM.java to your root project directory and add `JPM.portChildProjects();` before building.
 This is going to download and copy the latest JPM.java file into all child projects it can find
 in this directory, and also run it to generate an initial pom.xml for that child project.
 The child projects name will be the same as its directory name.
+
+<details>
+<summary></summary>
+
 
 A child project is detected
 if a src/main/java folder structure exists, and the parent folder of src/ is then used as child project root.  
@@ -122,46 +125,27 @@ since it can easily retrieve values for props defined in the nearest JPM.propert
 
 </details>
 
-#### 1JPM automatically resolves parent and child projects
-<details>
-<summary></summary>
-
+#### 🧭 1JPM automatically resolves parent and child projects
 See `project.isAutoParentsAndChildren`.
 If true updates current pom, all parent and all child pom.xml
 files with the respective parent details, adding seamless multi-module/project support.
+
+<details>
+<summary></summary>
+
 
 This expects that the parent pom is always inside the parent directory,
 otherwise a performant search is not possible since the entire disk would need to be checked.
 </details>
 
-#### 1JPM helps porting your multi-module project
-<details>
-<summary></summary>
-
-Add JPM.java to your root project directory and add `JPM.portChildProjects();` before building.
-This is going to download and copy the latest JPM.java file into all child projects it can find
-in this directory, and also run it to generate an initial pom.xml for that child project.
-The child projects name will be the same as its directory name.
-
-A child project is detected
-if a src/main/java folder structure exists, and the parent folder of src/ is then used as child project root.  
-Note that a child project is expected to be directly inside a subdirectory of this project.
-
-Now `project.isAutoParentsAndChildren` will work properly, since all needed pom.xml files should exist.
-
-Do you also need something like global variables across those projects? 
-Then the `String val = $("key");` function might be of help to you,
-since it can easily retrieve values for props defined in the nearest JPM.properties file.
-
-</details>
-
-#### 1JPM can create native executables
-<details>
-<summary></summary>
+#### 🧊 1JPM can create native executables
 
 GraalVM must be installed, then simply add `JPM.plugins.add(NativeImagePlugin.get);` before building.
-
 The `NativeImagePlugin` in 1JPM is designed to integrate GraalVM's native image building capabilities into your Java project with minimal configuration. By default, it does the following:
+
+<details>
+<summary></summary>
+
 
 1. **Image Generation**: It builds a native executable from your Java application using GraalVM. The generated executable is placed in the `target` directory.
 
@@ -179,12 +163,13 @@ For more details see [this GraalVM article](https://graalvm.github.io/native-bui
 
 </details>
 
-#### 1JPM can create native installers
+#### 📦 1JPM can create native installers
+Simply add `JPM.plugins.add(PackagerPlugin.get);` before building.
+With the default configuration, the `PackagerPlugin` in 1JPM:
+
 <details>
 <summary></summary>
 
-Simply add `JPM.plugins.add(PackagerPlugin.get);` before building.
-With the default configuration, the `PackagerPlugin` in 1JPM:
 
 - **Bundles a JRE** with the application package, ensuring the packaged application is self-contained and can run on any system without requiring an external JRE.
 - **Uses the project's main class** as the entry point for the application, which is automatically set based on the project's configuration.
@@ -196,39 +181,33 @@ For more details see [JavaPackager on GitHub](https://github.com/fvarrui/JavaPac
 
 </details>
 
-#### 1JPM is Maven based
+#### 📚 1JPM is Maven based
+1JPM is a Maven pom.xml generator and includes some extra plugins to increase runtime safety and provide additional features out of the box.
+
 <details>
 <summary></summary>
 
-Note that 1JPM is now using **Maven under the hood**, since the complexity as a fully independent build tool
+We use Maven since the complexity as a fully independent build tool
 (see version [1.0.3](https://github.com/Osiris-Team/1JPM/blob/1.0.3/src/main/java/JPM.java)) was too high for a single file. Besides, this gives us access to more features, a rich and mature plugin ecosystem, as well as **great IDE compatibility**. 1JPM will take care of generating the pom.xml, downloading the Maven-Wrapper, and then executing Maven as you can see above`.
 
 </details>
 
-#### 1JPM has plugins
-<details>
-<summary></summary>
-
+#### 🔌 1JPM has plugins
 A 1JPM plugin is basically a wrapper around a Maven plugin (its xml), providing easy access to its features, but can also be anything else to make building easier.
 These third-party plugins can be added simply by appending their Java code inside the ThirdPartyPlugins class.
 You can find a list here at [#1jpm-plugin](https://github.com/topics/1jpm-plugin?o=desc&s=updated).
 (these must be written in Java 8 and not use external dependencies).
-</details>
 
 
-#### 1JPM saves you time
-<details>
-<summary></summary>
-
+#### ⏱️ 1JPM saves you time
 How many lines of relevant build code do we save compared to Maven?
 - 1JPM: 128 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/src/main/java/JPM.java))
 - Maven: 391 lines (see [here](https://github.com/Osiris-Team/AutoPlug-Client/blob/bd580033dea4f0cb7399496e9a01bf8047fb5d88/pom.xml))
 
 Thus we write the same config with **263 lines less** code (which is a **3x** saving) when using 1JPM!
-</details>
 
 
-#### How can I modify the generated pom.xml file? How to use the XML class?
+#### 🛠️ How can I modify the generated pom.xml file? How to use the XML class?
 <details>
 <summary></summary>
 
@@ -252,7 +231,7 @@ public com.mycompany.core.JPM.XML toXML() {
 ```
 </details>
 
-#### 1JPM is able to auto-update itself
+#### 🔄 1JPM is able to auto-update itself
 
 
 ## Why a single file?
