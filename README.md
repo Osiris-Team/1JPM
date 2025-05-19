@@ -79,7 +79,7 @@ javadoc and with-dependencies jars.
 
 ### Additional goodies and FAQ
 
-#### 🕒 Execute your custom Java code at compile time
+#### ☕ Execute your custom Java code at compile time
 Write your build scripts directly in Java!
 A simple usage example is adding a timestamp/version of the current build
 somewhere inside your actual application. Your application code in Main.java then looks like this:
