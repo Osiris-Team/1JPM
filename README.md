@@ -48,7 +48,7 @@ public class JPM {
             addCompilerArg("-Xlint:deprecation");
 
             // Add additional plugins
-            //JPM.plugins.add(NativeImagePlugin.get); // or enable built-in ones
+            //JPM.plugins.add(PackagerPlugin.get); // or enable built-in ones
             //putPlugin("org.codehaus.mojo:exec-maven-plugin:1.6.0", d -> {
             //    d.putConfiguration("mainClass", this.mainClass);
             //});
@@ -140,8 +140,29 @@ otherwise a performant search is not possible since the entire disk would need t
 
 #### 🧊 1JPM can create native executables
 
-GraalVM must be installed, then simply add `JPM.plugins.add(NativeImagePlugin.get);` before building.
-The `NativeImagePlugin` in 1JPM is designed to integrate GraalVM's native image building capabilities into your Java project with minimal configuration. By default, it does the following:
+GraalVM must be installed and Visual Studio 2022, then simply add the following before building.
+
+```java
+            var n = new NativeImagePlugin();
+            n.onBeforeToXML(d -> {
+                d.addExecution("build-native", "package")
+                    .addGoal("compile-no-fork");
+            });
+            plugins.add(n);
+
+            // Execute build with GraalVM with JAVA_HOME updated
+            if(args != null){
+                generatePom();
+                if(!args.contains("skipMaven"))
+                    JPM.executeMaven(null, pb -> {
+                        pb.environment().put("JAVA_HOME", "C:\\Users\\YOUR_USERNAME\\YOUR_PATH\\graalvm-jdk-24.0.2");
+                    }, "package", "-DskipTests");
+                // or JPM.executeMaven(args); if you prefer the CLI, like "java JPM.java clean package"
+            }
+```
+
+The `NativeImagePlugin` in 1JPM is designed to integrate GraalVM's native image building capabilities into your Java project with minimal configuration. 
+By adding the above, it now does the following:
 
 <details>
 <summary></summary>
