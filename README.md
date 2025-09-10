@@ -143,12 +143,7 @@ otherwise a performant search is not possible since the entire disk would need t
 GraalVM must be installed and Visual Studio 2022, then simply add the following before building.
 
 ```java
-            var n = new NativeImagePlugin();
-            n.onBeforeToXML(d -> {
-                d.addExecution("build-native", "package")
-                    .addGoal("compile-no-fork");
-            });
-            plugins.add(n);
+            plugins.add(NativeImagePlugin.get);
 
             // Execute build with GraalVM with JAVA_HOME updated
             if(args != null){
@@ -162,7 +157,7 @@ GraalVM must be installed and Visual Studio 2022, then simply add the following 
 ```
 
 The `NativeImagePlugin` in 1JPM is designed to integrate GraalVM's native image building capabilities into your Java project with minimal configuration. 
-By adding the above, it now does the following:
+By default, it now does the following:
 
 <details>
 <summary></summary>

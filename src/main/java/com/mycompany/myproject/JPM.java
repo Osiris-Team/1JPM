@@ -1729,6 +1729,7 @@ public class JPM {
      * </p>
      */
     public static class NativeImagePlugin extends JPM.Plugin {
+        public static NativeImagePlugin get = new NativeImagePlugin();
 
         /**
          * The name of the generated native image. Defaults to the artifactId of the project.
@@ -1901,6 +1902,12 @@ public class JPM {
                 if (metadataRepositoryConfig != null) {
                     d.projectXml.add("configuration metadataRepository", metadataRepositoryConfig.toXML());
                 }
+
+                // Default execution
+                Execution eBuild = d.addExecution("build-native", "package").addGoal("compile-no-fork");
+
+                // Test execution
+                Execution eTest = d.addExecution("test-native", "test").addGoal("test");
             });
         }
     }
