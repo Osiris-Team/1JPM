@@ -22,13 +22,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class JPM {
     public static class ThisProject extends JPM.Project {
-        public ThisProject() throws Exception {
-            this(null);
-        }
-        public ThisProject(List<String> args) throws Exception {
+            public ThisProject() throws Exception {
+                this(null);
+            }
+            public ThisProject(List<String> args) throws Exception {
             // Override default configurations
             this.groupId = "com.mycompany.myproject";
             this.artifactId = "my-project";
@@ -68,7 +69,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
     
-    // 1JPM version 3.3.8 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.10 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -138,16 +139,47 @@ public class JPM {
         finalArgs.addAll(Arrays.asList(args));
         p.command(finalArgs);
         p.directory(userDir);
-        p.inheritIO();
+        //p.inheritIO();
+        p.redirectErrorStream();
         System.out.print("Executing: ");
         for (String arg : finalArgs) {
             System.out.print(arg+" ");
         }
         System.out.println();
-        Process result = p.start();
-        result.waitFor();
-        if(result.exitValue() != 0)
-            throw new RuntimeException("Maven ("+mavenWrapperFile.getName()+") finished with an error ("+result.exitValue()+"): "+mavenWrapperFile.getAbsolutePath());
+        Process process = p.start();
+        StringBuilder fullLog = new StringBuilder();
+
+        // Stream output live AND collect it
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.print("\rEXECUTING... "+(line.replace("\n", ""))+"                            "); // still show live output
+                System.out.flush();
+                fullLog.append(line).append("\n");
+            }
+            System.out.print("\rFINISHED! ");
+            System.out.flush();
+        }
+
+        String command = Arrays.stream(args).collect(Collectors.joining(" "));
+        process.waitFor();
+        String log = fullLog.toString();
+        File f = new File(System.getProperty("user.dir")+"/target/log "+
+                command+".txt");
+        try{
+            Files.write(f.toPath(),
+                    log.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+            System.out.println("Log written to: "+ f);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        if(process.exitValue() != 0){
+            MavenDependencyConvergenceParser.printForceDependencies(log);
+            throw new RuntimeException("Maven ("+command+") finished with an error ("+process.exitValue()+"), see the log: "+f);
+        }
     }
 
     public static void downloadMavenWrapper(File script) throws IOException {
@@ -606,10 +638,10 @@ public class JPM {
                     int p1 = i < parts1.length ? parseVersionPart(parts1[i]) : 0;
                     int p2 = i < parts2.length ? parseVersionPart(parts2[i]) : 0;
                     if (p1 != p2) {
-                        return Integer.compare(p2, p1);  // Reverse order for latest version first
+                        return Integer.compare(p1, p2);
                     }
                 }
-                return v2.compareTo(v1);  // Reverse order for latest version first
+                return v1.compareTo(v2);
             }
 
             private int parseVersionPart(String part) {
@@ -1453,6 +1485,80 @@ public class JPM {
             }
 
             return xml;
+        }
+    }
+
+    public static class MavenDependencyConvergenceParser {
+
+        public static void printForceDependencies(String log) {
+
+            Map<String, Set<String>> versionsByArtifact = new LinkedHashMap<>();
+
+            String[] lines = log.split("\n");
+
+            String currentGroup = null;
+            String currentArtifact = null;
+
+            for (String rawLine : lines) {
+
+                String line = rawLine.trim();
+
+                // 1️⃣ Detect new conflict block
+                if (line.contains("Dependency convergence error for ")) {
+
+                    int start = line.indexOf("for ") + 4;
+                    int end = line.indexOf(":jar:", start);
+
+                    if (start > 3 && end > start) {
+
+                        String ga = line.substring(start, end);
+                        String[] parts = ga.split(":");
+
+                        if (parts.length == 2) {
+                            currentGroup = parts[0];
+                            currentArtifact = parts[1];
+
+                            versionsByArtifact.putIfAbsent(
+                                    ga,
+                                    new HashSet<>()
+                            );
+                        }
+                    }
+
+                    continue;
+                }
+
+                // 2️⃣ Extract versions inside a conflict block
+                if (currentGroup != null && currentArtifact != null) {
+
+                    int idx = line.indexOf(currentGroup + ":" + currentArtifact + ":jar:");
+                    if (idx != -1) {
+
+                        int versionStart = idx + (currentGroup + ":" + currentArtifact + ":jar:").length();
+                        int versionEnd = line.indexOf(":", versionStart);
+
+                        if (versionEnd > versionStart) {
+                            String version = line.substring(versionStart, versionEnd).trim();
+                            versionsByArtifact
+                                    .get(currentGroup + ":" + currentArtifact)
+                                    .add(version);
+                        }
+                    }
+                }
+            }
+
+            // 3️⃣ Print highest versions (Maven-correct ordering)
+            if(!versionsByArtifact.isEmpty())
+                System.out.println("Duplicate dependency versions detected! If possible force their latest versions:");
+            versionsByArtifact.forEach((artifact, versions) -> {
+
+                String highest = versions.stream()
+                        .max(new Dependency.VersionComparator())
+                        .orElse("FAILED_TO_DETECT");
+
+                System.out.println("forceImplementation(\""
+                        + artifact + ":" + highest + "\");");
+            });
         }
     }
 
