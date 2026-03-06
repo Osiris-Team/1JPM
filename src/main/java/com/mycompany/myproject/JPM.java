@@ -37,6 +37,7 @@ public class JPM {
             this.mainClass = groupId+".MyMainClass";
             this.jarName = artifactId+".jar";
             this.fatJarName = artifactId+"-with-dependencies.jar";
+            this.javaVersion = "8";
 
             // If there are duplicate dependencies with different versions force a specific version like so:
             //forceImplementation("org.apache.commons:commons-lang3:3.12.0");
@@ -69,7 +70,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
     
-    // 1JPM version 3.3.10 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.11 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -1124,8 +1125,14 @@ public class JPM {
         public String groupId = "com.example";
         public String artifactId = "project";
         public String version = "1.0.0";
-        public String javaVersionSource = "8";
-        public String javaVersionTarget = "8";
+        /**
+         * Default version for {@link #javaVersionSource} {@link #javaVersionTarget} {@link #javaVersionRelease}.
+         * If you need a specific version for source, target or release, set those fields directly, instead of this one.
+         */
+        public String javaVersion = "8";
+        public String javaVersionSource = "";
+        public String javaVersionTarget = "";
+        public String javaVersionRelease = "";
         public List<Repository> repositories = new ArrayList<>();
         public List<Dependency> dependenciesManaged = new ArrayList<>();
         public List<Dependency> dependencies = new ArrayList<>();
@@ -1570,8 +1577,9 @@ public class JPM {
         public CompilerPlugin() {
             super("org.apache.maven.plugins", "maven-compiler-plugin", "3.8.1");
             onBeforeToXML(d -> {
-                d.putConfiguration("source", d.project.javaVersionSource);
-                d.putConfiguration("target", d.project.javaVersionTarget);
+                d.putConfiguration("source", d.project.javaVersionSource.isEmpty() ? d.project.javaVersion : d.project.javaVersionSource);
+                d.putConfiguration("target", d.project.javaVersionTarget.isEmpty() ? d.project.javaVersion : d.project.javaVersionTarget);
+                d.putConfiguration("release", d.project.javaVersionRelease.isEmpty() ? d.project.javaVersion : d.project.javaVersionRelease);
 
                 // Add compiler arguments from the project
                 if (!d.project.compilerArgs.isEmpty()) {
