@@ -70,7 +70,7 @@ public class JPM {
         // (If you want to develop a plugin take a look at "JPM.AssemblyPlugin" class further below to get started)
     }
     
-    // 1JPM version 3.3.11 by Osiris-Team: https://github.com/Osiris-Team/1JPM
+    // 1JPM version 3.3.12 by Osiris-Team: https://github.com/Osiris-Team/1JPM
     // Do not edit anything below, since changes will be lost due to auto-updating.
     // You can also do this manually, by replacing everything below with its newer version and updating the imports.
     public static final List<Plugin> plugins = new ArrayList<>();
@@ -169,8 +169,10 @@ public class JPM {
         File f = new File(System.getProperty("user.dir")+"/target/log "+
                 command+".txt");
         try{
+            f.getParentFile().mkdirs();
+            f.createNewFile();
             Files.write(f.toPath(),
-                    log.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+                    log.getBytes(StandardCharsets.UTF_8),
                     StandardOpenOption.TRUNCATE_EXISTING);
             System.out.println("Log written to: "+ f);
         } catch (Exception e) {
@@ -465,7 +467,8 @@ public class JPM {
                 String jpmJavaContent = contentToString(url);
                 jpmJavaContent = jpmJavaContent.replace(".myproject", "."+childProjectDir.getName())
                         .replace("my-project", childProjectDir.getName());
-                Files.write(jpmFile.toPath(), jpmJavaContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                jpmFile.createNewFile();
+                Files.write(jpmFile.toPath(), jpmJavaContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
                 System.out.println("Created JPM.java file for child project '"+childProjectDir.getName()+"'.");
 
                 execJavaJpmJava(childProjectDir);
